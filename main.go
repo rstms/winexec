@@ -1,0 +1,271 @@
+package main
+
+import (
+	"context"
+	_ "embed"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"github.com/cratonica/trayhost"
+	"log"
+	"net/http"
+	"os"
+	"runtime"
+	"time"
+)
+
+//go:embed icon.ico
+var iconData []byte
+
+const serverName = "winexec"
+const defaultPort = 10080
+const SHUTDOWN_TIMEOUT = 5
+const Version = "0.0.1"
+
+var Verbose bool
+var Debug bool
+
+var ShutdownRequest chan struct{}
+var ShutdownComplete chan struct{}
+
+func main() {
+	addr := flag.String("addr", "127.0.0.1", "listen address")
+	port := flag.Int("port", defaultPort, "listen port")
+	debugFlag := flag.Bool("debug", false, "run in foreground mode")
+	verboseFlag := flag.Bool("verbose", false, "verbose mode")
+	versionFlag := flag.Bool("version", false, "output version")
+
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("%s v%s\n", os.Args[0], Version)
+		os.Exit(0)
+	}
+
+	Verbose = *verboseFlag
+	Debug = *debugFlag
+
+	ShutdownRequest = make(chan struct{})
+	ShutdownComplete = make(chan struct{})
+
+	fmt.Printf("iconData len=%v\n", len(iconData))
+
+	// Ensure the program is run with a Windows GUI context
+	runtime.LockOSThread()
+	//systray.Run(onReady, onExit)
+	go func() {
+		go runServer(addr, port)
+		trayhost.SetUrl("http://127.0.0.1:10080/ping/")
+	}()
+
+	trayhost.EnterLoop("winexec", iconData)
+	ShutdownRequest <- struct{}{}
+	<-ShutdownComplete
+}
+
+/*
+func onReady() {
+	// Set the icon and tooltip
+	//systray.SetIcon(iconData)
+	title := fmt.Sprintf("winexec v%s", Version)
+	systray.SetTitle(title)
+	systray.SetTooltip(title)
+
+	// Add menu items
+	mQuit := systray.AddMenuItem("Quit", "Shutdown and exit")
+
+	// Handle menu item clicks
+	go func() {
+		for {
+			select {
+			case <-mQuit.ClickedCh:
+				systray.Quit()
+			}
+		}
+	}()
+
+	go runServer(addr, port)
+}
+
+func onExit() {
+	// Clean up here
+	ShutdownRequest <- struct{}{}
+	<-ShutdownComplete
+}
+*/
+
+type Response struct {
+	Success bool
+	Message string
+	Data    interface{}
+}
+
+func fail(w http.ResponseWriter, message string, status int) {
+	log.Printf("  [%d] %s", status, message)
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(Response{false, message, struct{}{}})
+}
+
+func succeed(w http.ResponseWriter, message string, status int, result interface{}) {
+	log.Printf("  [%d] %s", status, message)
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(Response{true, message, result})
+}
+
+func checkClientCert(w http.ResponseWriter, r *http.Request) bool {
+	if Debug {
+		return true
+	}
+	usernameHeader, ok := r.Header["X-Client-Cert-Dn"]
+	if !ok {
+		fail(w, "missing client cert DN", http.StatusBadRequest)
+		return false
+	}
+	if Verbose {
+		log.Printf("client cert dn: %s\n", usernameHeader[0])
+	}
+	if usernameHeader[0] != "CN=winexec" {
+		fail(w, fmt.Sprintf("client cert (%s) != filterctl", usernameHeader[0]), http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+/*
+func sendClasses(w http.ResponseWriter, config *classes.SpamClasses, address string) {
+	result := config.GetClasses(address)
+	message := fmt.Sprintf("%s spam classes", address)
+	succeed(w, message, http.StatusOK, result)
+}
+
+func handleGetClass(w http.ResponseWriter, r *http.Request) {
+	if !checkClientCert(w, r) {
+		return
+	}
+	address := r.PathValue("address")
+	scoreParam := r.PathValue("score")
+	log.Printf("GET address=%s score=%s\n", address, scoreParam)
+	score, err := strconv.ParseFloat(scoreParam, 32)
+	if err != nil {
+		fail(w, "score conversion failed", http.StatusBadRequest)
+		return
+	}
+	config, ok := readConfig(w)
+	if ok {
+		class := config.GetClass([]string{address}, float32(score))
+		succeed(w, class, http.StatusOK, []classes.SpamClass{{class, float32(score)}})
+	}
+}
+
+func handleGetClasses(w http.ResponseWriter, r *http.Request) {
+	if !checkClientCert(w, r) {
+		return
+	}
+	address := r.PathValue("address")
+	log.Printf("GET address=%s\n", address)
+	config, ok := readConfig(w)
+	if ok {
+		sendClasses(w, config, address)
+	}
+}
+
+func handlePutClassThreshold(w http.ResponseWriter, r *http.Request) {
+	if !checkClientCert(w, r) {
+		return
+	}
+	address := r.PathValue("address")
+	name := r.PathValue("name")
+	threshold := r.PathValue("threshold")
+	log.Printf("PUT address=%s name=%s threshold=%s\n", address, name, threshold)
+	score, err := strconv.ParseFloat(threshold, 32)
+	if err != nil {
+		fail(w, "threshold conversion failed", http.StatusBadRequest)
+		return
+	}
+	config, ok := readConfig(w)
+	if ok {
+		config.SetThreshold(address, name, float32(score))
+		if writeConfig(w, config) {
+			sendClasses(w, config, address)
+		}
+	}
+}
+
+func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
+	if !checkClientCert(w, r) {
+		return
+	}
+	address := r.PathValue("address")
+	log.Printf("DELETE (user) address=%s\n", address)
+	config, ok := readConfig(w)
+	if ok {
+		config.DeleteClasses(address)
+		if writeConfig(w, config) {
+			result := []classes.SpamClass{}
+			succeed(w, "deleted", http.StatusOK, result)
+		}
+	}
+}
+
+func handleDeleteClass(w http.ResponseWriter, r *http.Request) {
+	if !checkClientCert(w, r) {
+		return
+	}
+	address := r.PathValue("address")
+	name := r.PathValue("name")
+	log.Printf("DELETE (class) address=%s name=%s\n", address, name)
+	config, ok := readConfig(w)
+	if ok {
+		config.GetClasses(address)
+		config.DeleteClass(address, name)
+		if writeConfig(w, config) {
+			sendClasses(w, config, address)
+		}
+	}
+}
+*/
+
+func handleHello(w http.ResponseWriter, r *http.Request) {
+
+	data := make(map[string]string)
+	data["response"] = "pong"
+	succeed(w, "hello", 200, data)
+}
+
+func runServer(addr *string, port *int) {
+
+	listen := fmt.Sprintf("%s:%d", *addr, *port)
+	server := http.Server{
+		Addr: listen,
+	}
+
+	http.HandleFunc("GET /ping/", handleHello)
+	/*
+		http.HandleFunc("GET /filterctl/classes/{address}", handleGetClasses)
+		http.HandleFunc("GET /filterctl/class/{address}/{score}", handleGetClass)
+		http.HandleFunc("PUT /filterctl/classes/{address}/{name}/{threshold}", handlePutClassThreshold)
+		http.HandleFunc("DELETE /filterctl/classes/{address}", handleDeleteUser)
+		http.HandleFunc("DELETE /filterctl/classes/{address}/{name}", handleDeleteClass)
+	*/
+
+	go func() {
+		log.Printf("%s v%s listening on %s\n", serverName, Version, listen)
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalln("ListenAndServe failed: ", err)
+		}
+	}()
+
+	<-ShutdownRequest
+
+	log.Println("shutting down")
+	ctx, cancel := context.WithTimeout(context.Background(), SHUTDOWN_TIMEOUT*time.Second)
+	defer cancel()
+
+	err := server.Shutdown(ctx)
+	if err != nil {
+		log.Fatalln("Server Shutdown failed: ", err)
+	}
+	log.Println("shutdown complete")
+	ShutdownComplete <- struct{}{}
+}
