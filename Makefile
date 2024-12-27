@@ -6,7 +6,7 @@ program != basename $$(pwd)
 version != cat VERSION
 
 testo:
-	wintool gitclean; echo $$?
+	gitclean || $(error git status is dirty)
 	echo "still running"
 
 build: fmt
