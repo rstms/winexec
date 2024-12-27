@@ -6,7 +6,7 @@ program != basename $$(pwd)
 version != cat VERSION
 
 testo:
-	gitclean || $(error git status is dirty)
+	@echo git status is $(if $(shell git status --porcelain),$(error git status is dirty),clean)
 	echo "still running"
 
 build: fmt
