@@ -53,11 +53,10 @@ func main() {
 	ShutdownRequest = make(chan struct{})
 	ShutdownComplete = make(chan struct{})
 
-	// Ensure the program is run with a Windows GUI context
-	runtime.LockOSThread()
-
 	go runServer(addr, port)
 
+	// Ensure the program is run with a Windows GUI context
+	runtime.LockOSThread()
 	systray.Run(onReady, onExit)
 }
 
