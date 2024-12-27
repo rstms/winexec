@@ -23,7 +23,6 @@ var serverCert []byte
 //go:embed server.key
 var serverKey []byte
 
-
 const serverName = "winexec"
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
@@ -231,28 +230,27 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 
 func runServer(addr *string, port *int) {
 
-        certFile, err := ioutil.TempFile("", "server.crt")
-        if err != nil {
-            log.Fatal(err)
-        }
-        defer os.Remove(certFile.Name())
-        _, err = certFile.Write(serverCert)
-        if err != nil {
-            log.Fatal(err)
-        }
-        certFile.Close()
+	certFile, err := ioutil.TempFile("", "server.crt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(certFile.Name())
+	_, err = certFile.Write(serverCert)
+	if err != nil {
+		log.Fatal(err)
+	}
+	certFile.Close()
 
-        keyFile, err := ioutil.TempFile("", "server.key")
-        if err != nil {
-            log.Fatal(err)
-        }
-        defer os.Remove(keyFile.Name())
-        _, err = keyFile.Write(serverKey)
-        if err != nil {
-            log.Fatal(err)
-        }
-        keyFile.Close()
-
+	keyFile, err := ioutil.TempFile("", "server.key")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(keyFile.Name())
+	_, err = keyFile.Write(serverKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	keyFile.Close()
 
 	listen := fmt.Sprintf("%s:%d", *addr, *port)
 	server := http.Server{
@@ -270,7 +268,7 @@ func runServer(addr *string, port *int) {
 
 	go func() {
 		log.Printf("%s v%s listening on %s\n", serverName, Version, listen)
-                err := server.ListenAndServeTLS(certFile.Name(), keyFile.Name())
+		err := server.ListenAndServeTLS(certFile.Name(), keyFile.Name())
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalln("ListenAndServeTLS failed: ", err)
 		}
