@@ -20,7 +20,7 @@ var iconData []byte
 const serverName = "winexec"
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
-const Version = "0.0.4"
+const Version = "0.0.1"
 
 var Verbose bool
 var Debug bool
