@@ -90,18 +90,22 @@ func onExit() {
 }
 
 type FailResponse struct {
-	message string
+	Success bool
+	Error   string
 }
 
 type PingResponse struct {
+	Success bool
 	Message string
 }
 
 type ExecRequest struct {
 	Command string
+	Args    []string
 }
 
 type ExecResponse struct {
+	Success  bool
 	Command  string
 	ExitCode int
 	Stdout   string
@@ -109,13 +113,22 @@ type ExecResponse struct {
 }
 
 func fail(w http.ResponseWriter, message string) {
-	status := http.StatusInternalServerError
-	log.Printf(" fail: [%d] %s\n", status, message)
-	http.Error(w, message, status)
+	status := http.StatusBadRequest
+	response := FailResponse{false, message}
+	if Verbose {
+		log.Printf(" fail: [%d] %s\n", status, message)
+	}
+	w.WriteHeader(status)
+	err := json.NewEncoder(w).Encode(&response)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func succeed(w http.ResponseWriter, response interface{}) {
-	log.Printf("  response: [200] %+v\n", response)
+	if Verbose {
+		log.Printf("  response: [200] %+v\n", response)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
@@ -131,22 +144,23 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exit, stdout, stderr, err := Run(request.Command)
+	exit, stdout, stderr, err := Run(request.Command, request.Args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		fail(w, err.Error())
 		return
 	}
 	response := ExecResponse{
-		Command:  request.Command,
-		ExitCode: exit,
-		Stdout:   stdout,
-		Stderr:   stderr,
+		true,
+		request.Command,
+		exit,
+		stdout,
+		stderr,
 	}
 	succeed(w, &response)
 }
 
 func handlePing(w http.ResponseWriter, r *http.Request) {
-	response := PingResponse{"pong"}
+	response := PingResponse{true, "pong"}
 	succeed(w, &response)
 }
 
