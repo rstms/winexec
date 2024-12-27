@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/cratonica/trayhost"
+	"github.com/getlantern/systray"
 	"log"
 	"net/http"
 	"os"
@@ -52,21 +52,13 @@ func main() {
 
 	// Ensure the program is run with a Windows GUI context
 	runtime.LockOSThread()
-	//systray.Run(onReady, onExit)
-	go func() {
-		go runServer(addr, port)
-		trayhost.SetUrl("http://127.0.0.1:10080/ping/")
-	}()
 
-	trayhost.EnterLoop("winexec", iconData)
-	ShutdownRequest <- struct{}{}
-	<-ShutdownComplete
+	systray.Run(onReady, onExit)
 }
 
-/*
 func onReady() {
 	// Set the icon and tooltip
-	//systray.SetIcon(iconData)
+	systray.SetIcon(iconData)
 	title := fmt.Sprintf("winexec v%s", Version)
 	systray.SetTitle(title)
 	systray.SetTooltip(title)
@@ -92,7 +84,6 @@ func onExit() {
 	ShutdownRequest <- struct{}{}
 	<-ShutdownComplete
 }
-*/
 
 type Response struct {
 	Success bool
