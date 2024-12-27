@@ -1,5 +1,9 @@
 # go makefile
 
+ifeq ($(GITHUB_TOKEN),)
+$(error GITHUB_TOKEN unset)
+endif
+
 program != basename $$(pwd)
 
 latest_release != gh release list --json tagName --jq ".[0].tagName" | tr -d v
