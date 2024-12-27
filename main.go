@@ -29,7 +29,7 @@ var ShutdownRequest chan struct{}
 var ShutdownComplete chan struct{}
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1", "listen address")
+	addr := flag.String("addr", "0.0.0.0", "listen address")
 	port := flag.Int("port", defaultPort, "listen port")
 	debugFlag := flag.Bool("debug", false, "run in foreground mode")
 	verboseFlag := flag.Bool("verbose", false, "verbose mode")
@@ -48,10 +48,10 @@ func main() {
 	ShutdownRequest = make(chan struct{})
 	ShutdownComplete = make(chan struct{})
 
-	fmt.Printf("iconData len=%v\n", len(iconData))
-
 	// Ensure the program is run with a Windows GUI context
 	runtime.LockOSThread()
+
+	go runServer(addr, port)
 
 	systray.Run(onReady, onExit)
 }
@@ -76,7 +76,6 @@ func onReady() {
 		}
 	}()
 
-	go runServer(addr, port)
 }
 
 func onExit() {
