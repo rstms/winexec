@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
-	_ "embed"
+	"crypto/tls"
+	"crypto/x509"
+	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/getlantern/systray"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -88,177 +89,109 @@ func onExit() {
 	<-ShutdownComplete
 }
 
-type Response struct {
-	Success bool
+type FailResponse struct {
+	message string
+}
+
+type PingResponse struct {
 	Message string
-	Data    interface{}
 }
 
-func fail(w http.ResponseWriter, message string, status int) {
-	log.Printf("  [%d] %s", status, message)
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(Response{false, message, struct{}{}})
+type ExecRequest struct {
+	Command string
 }
 
-func succeed(w http.ResponseWriter, message string, status int, result interface{}) {
-	log.Printf("  [%d] %s", status, message)
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(Response{true, message, result})
+type ExecResponse struct {
+	Command  string
+	ExitCode int
+	Stdout   string
+	Stderr   string
 }
 
-func checkClientCert(w http.ResponseWriter, r *http.Request) bool {
-	if Debug {
-		return true
-	}
-	usernameHeader, ok := r.Header["X-Client-Cert-Dn"]
-	if !ok {
-		fail(w, "missing client cert DN", http.StatusBadRequest)
-		return false
-	}
-	if Verbose {
-		log.Printf("client cert dn: %s\n", usernameHeader[0])
-	}
-	if usernameHeader[0] != "CN=winexec" {
-		fail(w, fmt.Sprintf("client cert (%s) != filterctl", usernameHeader[0]), http.StatusBadRequest)
-		return false
-	}
-	return true
+func fail(w http.ResponseWriter, message string) {
+	status := http.StatusInternalServerError
+	log.Printf(" fail: [%d] %s\n", status, message)
+	http.Error(w, message, status)
 }
 
-/*
-func sendClasses(w http.ResponseWriter, config *classes.SpamClasses, address string) {
-	result := config.GetClasses(address)
-	message := fmt.Sprintf("%s spam classes", address)
-	succeed(w, message, http.StatusOK, result)
-}
-
-func handleGetClass(w http.ResponseWriter, r *http.Request) {
-	if !checkClientCert(w, r) {
-		return
-	}
-	address := r.PathValue("address")
-	scoreParam := r.PathValue("score")
-	log.Printf("GET address=%s score=%s\n", address, scoreParam)
-	score, err := strconv.ParseFloat(scoreParam, 32)
+func succeed(w http.ResponseWriter, response interface{}) {
+	log.Printf("  response: [200] %+v\n", response)
+	w.Header().Set("Content-Type", "application/json")
+	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
-		fail(w, "score conversion failed", http.StatusBadRequest)
-		return
-	}
-	config, ok := readConfig(w)
-	if ok {
-		class := config.GetClass([]string{address}, float32(score))
-		succeed(w, class, http.StatusOK, []classes.SpamClass{{class, float32(score)}})
+		fail(w, err.Error())
 	}
 }
 
-func handleGetClasses(w http.ResponseWriter, r *http.Request) {
-	if !checkClientCert(w, r) {
-		return
-	}
-	address := r.PathValue("address")
-	log.Printf("GET address=%s\n", address)
-	config, ok := readConfig(w)
-	if ok {
-		sendClasses(w, config, address)
-	}
-}
-
-func handlePutClassThreshold(w http.ResponseWriter, r *http.Request) {
-	if !checkClientCert(w, r) {
-		return
-	}
-	address := r.PathValue("address")
-	name := r.PathValue("name")
-	threshold := r.PathValue("threshold")
-	log.Printf("PUT address=%s name=%s threshold=%s\n", address, name, threshold)
-	score, err := strconv.ParseFloat(threshold, 32)
+func handleExec(w http.ResponseWriter, r *http.Request) {
+	var request ExecRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		fail(w, "threshold conversion failed", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	config, ok := readConfig(w)
-	if ok {
-		config.SetThreshold(address, name, float32(score))
-		if writeConfig(w, config) {
-			sendClasses(w, config, address)
-		}
+
+	exit, stdout, stderr, err := Run(request.Command)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
+	response := ExecResponse{
+		Command:  request.Command,
+		ExitCode: exit,
+		Stdout:   stdout,
+		Stderr:   stderr,
+	}
+	succeed(w, &response)
 }
 
-func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
-	if !checkClientCert(w, r) {
-		return
-	}
-	address := r.PathValue("address")
-	log.Printf("DELETE (user) address=%s\n", address)
-	config, ok := readConfig(w)
-	if ok {
-		config.DeleteClasses(address)
-		if writeConfig(w, config) {
-			result := []classes.SpamClass{}
-			succeed(w, "deleted", http.StatusOK, result)
-		}
-	}
-}
-
-func handleDeleteClass(w http.ResponseWriter, r *http.Request) {
-	if !checkClientCert(w, r) {
-		return
-	}
-	address := r.PathValue("address")
-	name := r.PathValue("name")
-	log.Printf("DELETE (class) address=%s name=%s\n", address, name)
-	config, ok := readConfig(w)
-	if ok {
-		config.GetClasses(address)
-		config.DeleteClass(address, name)
-		if writeConfig(w, config) {
-			sendClasses(w, config, address)
-		}
-	}
-}
-*/
-
-func handleHello(w http.ResponseWriter, r *http.Request) {
-	if !checkClientCert(w, r) {
-		return
-	}
-	data := make(map[string]string)
-	data["response"] = "pong"
-	succeed(w, "hello", 200, data)
+func handlePing(w http.ResponseWriter, r *http.Request) {
+	response := PingResponse{"pong"}
+	succeed(w, &response)
 }
 
 func runServer(addr *string, port *int) {
 
-	serverCert, err := certs.ReadFile("certs/server.crt")
+	serverCertPEM, err := certs.ReadFile("certs/cert.pem")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed reading server certificate: %v", err)
 	}
 
-	serverKey, err := certs.ReadFile("certs/server.key")
+	serverKeyPEM, err := certs.ReadFile("certs/key.pem")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed reading server certificate key: %v", err)
 	}
 
-        caCert, err := certs.ReadFile("certs/ca.pem")
-        if err != nil {
-                log.Fatal(err)
-        }
+	serverCert, err := tls.X509KeyPair(serverCertPEM, serverKeyPEM)
+	if err != nil {
+		log.Fatalf("Failed creating X509 keypair: %v", err)
+	}
 
-        caCertPool := tls.NewCertPool()
-        caCertPool.AppendCertsFromPEM(caCert)
+	caCertPEM, err := certs.ReadFile("certs/ca.pem")
+	if err != nil {
+		log.Fatalf("Failed reading CA file: %v", err)
+	}
 
-        tlsConfig := &tls.Config{
-            ClientAuth: tls.RequireAndVerifyClientCert,
-            ClientCAs: caCertPool,
-        }
+	caCertPool := x509.NewCertPool()
+	ok := caCertPool.AppendCertsFromPEM(caCertPEM)
+	if !ok {
+		log.Fatalf("failed appending CA cert to pool")
+	}
 
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    caCertPool,
+	}
+
+	listen := fmt.Sprintf("%s:%d", *addr, *port)
 	server := http.Server{
-		Addr: fmt.Sprintf("%s:%d", *addr, *port),
-                TLSConfig: tlsConfig,
+		Addr:      listen,
+		TLSConfig: tlsConfig,
 	}
 
-	http.HandleFunc("GET /ping/", handleHello)
+	http.HandleFunc("GET /ping/", handlePing)
+	http.HandleFunc("POST /exec/", handleExec)
 	/*
 		http.HandleFunc("GET /filterctl/classes/{address}", handleGetClasses)
 		http.HandleFunc("GET /filterctl/class/{address}/{score}", handleGetClass)
@@ -269,9 +202,9 @@ func runServer(addr *string, port *int) {
 
 	go func() {
 		log.Printf("%s v%s listening on %s\n", serverName, Version, listen)
-		err := server.ListenAndServeTLS(certFile.Name(), keyFile.Name())
+		err := server.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalln("ListenAndServeTLS failed: ", err)
+			log.Fatalln("ServeTLS failed: ", err)
 		}
 	}()
 

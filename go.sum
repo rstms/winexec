@@ -1,5 +1,3 @@
-github.com/cratonica/trayhost v0.0.0-20150112162955-98495206fd96 h1:6ipVfy6FIZfwZW16Mw4dDEuF/5bpbOt5J65qytYoGLc=
-github.com/cratonica/trayhost v0.0.0-20150112162955-98495206fd96/go.mod h1:/XONIvvU6d8zIYt5U9T3fCtR+QJ28Qma1Pnz/OfIJsU=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/getlantern/context v0.0.0-20190109183933-c447772a6520 h1:NRUJuo3v3WGC/g5YiyF790gut6oQr5f3FBI88Wv0dx4=
