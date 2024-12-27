@@ -2,14 +2,13 @@
 
 program != basename $$(pwd)
 
-#latest_release != gh release list --json tagName --jq '.[0].tagName' | tr -d v
+latest_release != gh release list --json tagName --jq '.[0].tagName' | tr -d v
 version != cat VERSION
 
 gitclean := $(if $(shell git status --porcelain),$(error git status is dirty),)
 
-testo:
-	$(gitclean)
-	echo "still running"
+status:
+	@echo latest_release: $(latest_release)
 
 build: fmt
 	fix go build
@@ -31,8 +30,7 @@ test:
 	fix -- go test -failfast -v ./...
 
 release: build
-	@$(gitclean) || { [ -n "$(dirty)" ] && echo "allowing dirty release"; }
-	@$(if $(update),gh release delete -y v$(version),)
+	$(gitclean)
 	gh release create v$(version) --notes "v$(version)"
 
 testclean:
