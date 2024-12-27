@@ -25,7 +25,7 @@ var certs embed.FS
 const serverName = "winexec"
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
-const Version = "0.0.5"
+const Version = "0.0.6"
 
 var Verbose bool
 var Debug bool
