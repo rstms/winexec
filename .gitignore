@@ -1,2 +1,4 @@
 winexec
 winexec.exe
+*.crt
+*.key
