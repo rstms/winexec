@@ -42,8 +42,9 @@ func Run(command string, args ...string) (int, string, string, error) {
 		switch e := err.(type) {
 		case *exec.ExitError:
 			exitCode = e.ExitCode()
+			err = nil
 		default:
-			exitCode = -1
+			return -1, "", "", err
 		}
 	}
 	if Debug {
