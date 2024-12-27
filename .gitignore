@@ -2,3 +2,4 @@ winexec
 winexec.exe
 *.crt
 *.key
+*.pem

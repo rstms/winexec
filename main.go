@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/getlantern/systray"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -17,11 +18,8 @@ import (
 //go:embed icon.ico
 var iconData []byte
 
-//go:embed server.crt
-var serverCert []byte
-
-//go:embed server.key
-var serverKey []byte
+//go:embed certs/*
+var certs embed.FS
 
 const serverName = "winexec"
 const defaultPort = 10080
@@ -64,13 +62,13 @@ func main() {
 
 func onReady() {
 	// Set the icon and tooltip
-	systray.SetIcon(iconData)
 	title := fmt.Sprintf("winexec v%s", Version)
 	systray.SetTitle(title)
 	systray.SetTooltip(title)
+	systray.SetIcon(iconData)
 
 	// Add menu items
-	mQuit := systray.AddMenuItem("Quit", "Shutdown and exit")
+	mQuit := systray.AddMenuItem(fmt.Sprintf("Quit %v", title), "Shutdown and exit")
 
 	// Handle menu item clicks
 	go func() {
@@ -222,7 +220,9 @@ func handleDeleteClass(w http.ResponseWriter, r *http.Request) {
 */
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
-
+	if !checkClientCert(w, r) {
+		return
+	}
 	data := make(map[string]string)
 	data["response"] = "pong"
 	succeed(w, "hello", 200, data)
@@ -230,31 +230,32 @@ func handleHello(w http.ResponseWriter, r *http.Request) {
 
 func runServer(addr *string, port *int) {
 
-	certFile, err := ioutil.TempFile("", "server.crt")
+	serverCert, err := certs.ReadFile("certs/server.crt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.Remove(certFile.Name())
-	_, err = certFile.Write(serverCert)
-	if err != nil {
-		log.Fatal(err)
-	}
-	certFile.Close()
 
-	keyFile, err := ioutil.TempFile("", "server.key")
+	serverKey, err := certs.ReadFile("certs/server.key")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer os.Remove(keyFile.Name())
-	_, err = keyFile.Write(serverKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	keyFile.Close()
 
-	listen := fmt.Sprintf("%s:%d", *addr, *port)
+        caCert, err := certs.ReadFile("certs/ca.pem")
+        if err != nil {
+                log.Fatal(err)
+        }
+
+        caCertPool := tls.NewCertPool()
+        caCertPool.AppendCertsFromPEM(caCert)
+
+        tlsConfig := &tls.Config{
+            ClientAuth: tls.RequireAndVerifyClientCert,
+            ClientCAs: caCertPool,
+        }
+
 	server := http.Server{
-		Addr: listen,
+		Addr: fmt.Sprintf("%s:%d", *addr, *port),
+                TLSConfig: tlsConfig,
 	}
 
 	http.HandleFunc("GET /ping/", handleHello)
@@ -280,7 +281,7 @@ func runServer(addr *string, port *int) {
 	ctx, cancel := context.WithTimeout(context.Background(), SHUTDOWN_TIMEOUT*time.Second)
 	defer cancel()
 
-	err := server.Shutdown(ctx)
+	err = server.Shutdown(ctx)
 	if err != nil {
 		log.Fatalln("Server Shutdown failed: ", err)
 	}
