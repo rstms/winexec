@@ -8,7 +8,7 @@ version != cat VERSION
 gitclean := $(if $(shell git status --porcelain),$(error git status is dirty),)
 
 testo:
-	@gitclean
+	$(gitclean)
 	echo "still running"
 
 build: fmt
