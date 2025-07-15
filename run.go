@@ -28,7 +28,7 @@ import (
 )
 
 func Spawn(command string) (int, error) {
-	cmd := exec.Command("cmd", "/c", "start "+command)
+	cmd := exec.Command("cmd", "/c", command)
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil

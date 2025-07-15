@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 )
 
@@ -112,6 +111,10 @@ type ExecResponse struct {
 	Stderr   string
 }
 
+type SpawnRequest struct {
+	Command string
+}
+
 type SpawnResponse struct {
 	Success  bool
 	Command  string
@@ -166,15 +169,14 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleSpawn(w http.ResponseWriter, r *http.Request) {
-	var request ExecRequest
+	var request SpawnRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	command := append([]string{request.Command}, request.Args...)
-	exitCode, err := Spawn(strings.Join(command, " "))
+	exitCode, err := Spawn(request.Command)
 	if err != nil {
 		fail(w, err.Error())
 		return
