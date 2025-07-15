@@ -1,8 +1,8 @@
 # go makefile
 
-ifeq ($(GITHUB_TOKEN),)
-$(error GITHUB_TOKEN unset)
-endif
+#ifeq ($(GITHUB_TOKEN),)
+#$(error GITHUB_TOKEN unset)
+#endif
 
 program != basename $$(pwd)
 
