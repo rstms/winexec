@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -111,6 +112,12 @@ type ExecResponse struct {
 	Stderr   string
 }
 
+type SpawnResponse struct {
+	Success  bool
+	Command  string
+	ExitCode int
+}
+
 func fail(w http.ResponseWriter, message string) {
 	status := http.StatusBadRequest
 	response := FailResponse{false, message}
@@ -154,6 +161,28 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 		exit,
 		stdout,
 		stderr,
+	}
+	succeed(w, &response)
+}
+
+func handleSpawn(w http.ResponseWriter, r *http.Request) {
+	var request ExecRequest
+	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	command := append([]string{request.Command}, request.Args...)
+	exitCode, err := Spawn(strings.Join(command, " "))
+	if err != nil {
+		fail(w, err.Error())
+		return
+	}
+	response := SpawnResponse{
+		true,
+		request.Command,
+		exitCode,
 	}
 	succeed(w, &response)
 }
@@ -205,13 +234,7 @@ func runServer(addr *string, port *int) {
 
 	http.HandleFunc("GET /ping/", handlePing)
 	http.HandleFunc("POST /exec/", handleExec)
-	/*
-		http.HandleFunc("GET /filterctl/classes/{address}", handleGetClasses)
-		http.HandleFunc("GET /filterctl/class/{address}/{score}", handleGetClass)
-		http.HandleFunc("PUT /filterctl/classes/{address}/{name}/{threshold}", handlePutClassThreshold)
-		http.HandleFunc("DELETE /filterctl/classes/{address}", handleDeleteUser)
-		http.HandleFunc("DELETE /filterctl/classes/{address}/{name}", handleDeleteClass)
-	*/
+	http.HandleFunc("POST /spawn/", handleSpawn)
 
 	go func() {
 		log.Printf("%s v%s listening on %s\n", serverName, Version, listen)

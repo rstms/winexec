@@ -27,6 +27,30 @@ import (
 	"os/exec"
 )
 
+func Spawn(command string) (int, error) {
+	cmd := exec.Command("cmd", "/c", "start "+command)
+	cmd.Stdin = nil
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	var exitCode int
+	if Debug {
+		log.Printf("Spawn: %v\n", cmd)
+	}
+	err := cmd.Run()
+	if err != nil {
+		switch e := err.(type) {
+		case *exec.ExitError:
+			exitCode = e.ExitCode()
+			err = nil
+		}
+	}
+	if Debug {
+		log.Printf("exitCode=%d\n", exitCode)
+		log.Printf("err=%v\n", err)
+	}
+	return exitCode, err
+}
+
 func Run(command string, args ...string) (int, string, string, error) {
 	if Debug {
 		log.Printf("Run: %s %v\n", command, args)
