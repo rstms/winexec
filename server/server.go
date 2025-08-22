@@ -128,13 +128,16 @@ func succeed(w http.ResponseWriter, r *http.Request, response interface{}) {
 
 func handleExec(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
-		log.Printf("%v\n", r)
+		log.Printf("%s -> %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
 	}
 	var request ExecRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if Verbose {
+		log.Printf("%+v\n", request)
 	}
 
 	exit, stdout, stderr, err := run(request.Command, request.Args...)
@@ -154,13 +157,16 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 
 func handleSpawn(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
-		log.Printf("%v\n", r)
+		log.Printf("%s -> %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
 	}
 	var request ExecRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if Verbose {
+		log.Printf("%+v\n", request)
 	}
 
 	command := append([]string{request.Command}, request.Args...)
@@ -197,6 +203,8 @@ func (d *Daemon) pemFile(name string) ([]byte, error) {
 		}
 		filename = filepath.Join(home, filename[1:])
 	}
+	filename = filepath.Clean(filename)
+	log.Printf("Certificate %s: %s\n", name, filename)
 	return os.ReadFile(filename)
 }
 

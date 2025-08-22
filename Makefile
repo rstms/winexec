@@ -9,7 +9,7 @@ rstms_modules = $(shell awk <go.mod '/^module/{next} /rstms/{print $$1}')
 $(program): build
 
 build: fmt
-	CGO_ENABLED=1 fix go build
+	fix go build
 
 fmt: go.sum
 	fix go fmt . ./...

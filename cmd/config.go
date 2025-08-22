@@ -63,7 +63,7 @@ optional edit command opens current config file in system editor
 				cobra.CheckErr(fmt.Errorf("unknown command: %s", args[0]))
 			}
 		}
-		if viper.GetBool("verbose") {
+		if ViperGetBool("verbose") {
 			currentUser, err := user.Current()
 			cobra.CheckErr(err)
 			hostname, err := os.Hostname()
@@ -83,11 +83,11 @@ optional edit command opens current config file in system editor
 
 			userConfig, err := os.UserConfigDir()
 			cobra.CheckErr(err)
-			fmt.Printf("# default_config_dir: %s\n", filepath.Join(userConfig, "boxen"))
+			fmt.Printf("# default_config_dir: %s\n", filepath.Join(userConfig, rootCmd.Name()))
 
 			userCache, err := os.UserCacheDir()
 			cobra.CheckErr(err)
-			fmt.Printf("# default_cache_dir: %s\n", filepath.Join(userCache, "boxen"))
+			fmt.Printf("# default_cache_dir: %s\n", filepath.Join(userCache, rootCmd.Name()))
 			fmt.Println("")
 		}
 
