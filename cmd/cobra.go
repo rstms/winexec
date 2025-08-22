@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var ViperPrefix = ""
+var ViperPrefix = "winexec."
 var LogFile *os.File
 
 func ViperKey(name string) string {
@@ -58,7 +58,7 @@ func OptionString(cmd *cobra.Command, name, flag, defaultValue, description stri
 }
 
 func OpenLog() {
-	filename := viper.GetString("logfile")
+	filename := viper.GetString(ViperKey("logfile"))
 	LogFile = nil
 	if filename == "stdout" || filename == "-" {
 		log.SetOutput(os.Stdout)
@@ -76,7 +76,7 @@ func OpenLog() {
 		log.Printf("%s v%s startup\n", rootCmd.Name(), rootCmd.Version)
 		cobra.OnFinalize(CloseLog)
 	}
-	if viper.GetBool("debug") {
+	if viper.GetBool(ViperKey("debug")) {
 		log.SetFlags(log.Flags() | log.Lshortfile)
 	}
 }
@@ -126,7 +126,7 @@ func ExpandPath(pathname string) string {
 func InitConfig() {
 	viper.SetEnvPrefix(strings.ToLower(rootCmd.Name()))
 	viper.AutomaticEnv()
-	filename := viper.GetString("config")
+	filename := viper.GetString(ViperKey("config"))
 	if filename != "" {
 		viper.SetConfigFile(filename)
 	} else {
@@ -148,7 +148,7 @@ func InitConfig() {
 		}
 	}
 	OpenLog()
-	if viper.ConfigFileUsed() != "" && viper.GetBool("verbose") {
+	if viper.ConfigFileUsed() != "" && viper.GetBool(ViperKey("verbose")) {
 		log.Println("Using config file:", viper.ConfigFileUsed())
 	}
 }

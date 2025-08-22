@@ -45,6 +45,7 @@ logclean:
 
 clean: logclean
 	rm -f $(program) *.core 
+	rm -f server/certs/*.pem
 	go clean
 
 sterile: clean
@@ -53,3 +54,12 @@ sterile: clean
 	go clean -cache
 	go clean -modcache
 	rm -f go.mod go.sum
+
+
+server/certs/ca.pem:
+	cd server/certs && mkcert --chain ca.pem 
+
+server/certs/cert.pem:
+	cd server/certs && mkcert 127.0.0.1 --cert-file cert.pem --key-file key.pem --duration 10y -- --san localhost
+
+certs: server/certs/ca.pem server/certs/cert.pem

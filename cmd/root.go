@@ -31,18 +31,21 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
-	"bufio"
 	"fmt"
+	common "github.com/rstms/go-common"
 	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 var cfgFile string
 
 var rootCmd = &cobra.Command{
-	Use:   "winexec",
-	Short: "user session remote command execution daemon",
+	Use:     "winexec",
+	Version: server.Version,
+	Short:   "user session remote command execution daemon",
 	Long: `
 Run an HTTPS server under the logged-in 'on the glass' user sesssion.
 Endpoints provide authorized clients to execute a command line in this
@@ -50,16 +53,16 @@ context.  Any GUI programs started interact with the desktop as expected.
 An icon is displated in the 'task notification area'.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		addr := ViperGetString("addr")
-		port := ViperGetInt("port")
-		debug := ViperGetBool("debug")
-		verbose := ViperGetBool("verbose")
-		daemon, err := server.NewDaemon(addr, port, verbose, debug)
-		err = daemon.Start()
-		fmt.Printf("Hit ENTER to shutdown")
-		reader := bufio.NewReader(os.Stdin)
-		_, err = reader.ReadString('\n')
+		daemon, err := server.NewDaemon(cmd.Name())
 		cobra.CheckErr(err)
+		err = daemon.Start()
+		cobra.CheckErr(err)
+		sigint := make(chan os.Signal)
+		signal.Notify(sigint, syscall.SIGINT)
+		if ViperGetBool("verbose") {
+			fmt.Println("CTRL-C to shutdown")
+		}
+		<-sigint
 		err = daemon.Stop()
 		cobra.CheckErr(err)
 	},
@@ -71,9 +74,13 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
 func init() {
+	common.Init("winexec", server.Version)
 	cobra.OnInitialize(InitConfig)
 	OptionString(rootCmd, "config", "c", "", "config file")
+	OptionString(rootCmd, "address", "a", "127.0.0.1", "bind address")
+	OptionString(rootCmd, "port", "p", "10080", "listen port")
 	OptionString(rootCmd, "logfile", "l", "", "log filename")
 	OptionSwitch(rootCmd, "debug", "d", "enable debug diagnostics")
 	OptionSwitch(rootCmd, "verbose", "v", "enable diagnostic output")

@@ -68,7 +68,7 @@ optional edit command opens current config file in system editor
 			cobra.CheckErr(err)
 			hostname, err := os.Hostname()
 			cobra.CheckErr(err)
-			fmt.Println("# boxen config")
+			fmt.Printf("# %s config", rootCmd.Name())
 			fmt.Println("")
 			fmt.Printf("# active: %s\n", viper.ConfigFileUsed())
 			fmt.Printf("# generated: %s by %s@%s (%s_%s)\n",

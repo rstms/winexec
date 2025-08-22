@@ -8,22 +8,19 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/getlantern/systray"
+	"github.com/spf13/viper"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
-	"runtime"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
-//go:embed icon.ico
-var iconData []byte
-
 //go:embed certs/*
 var certs embed.FS
 
-const serverName = "winexec"
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
 const Version = "1.0.2"
@@ -32,18 +29,25 @@ var Verbose bool
 var Debug bool
 
 type Daemon struct {
+	Name             string
 	Address          string
+	Version          string
 	Port             int
+	started          chan struct{}
 	shutdownRequest  chan struct{}
 	shutdownComplete chan struct{}
+	menu             *Menu
 }
 
-func NewDaemon(addr string, port int, debug, verbose bool) (*Daemon, error) {
-	Verbose = verbose
-	Debug = debug
+func NewDaemon(name string) (*Daemon, error) {
+	Verbose = viper.GetBool(name + ".verbose")
+	Debug = viper.GetBool(name + ".debug")
 	d := Daemon{
-		Address:          addr,
-		Port:             port,
+		Name:             name,
+		Address:          viper.GetString(name + ".address"),
+		Port:             viper.GetInt(name + ".port"),
+		Version:          Version,
+		started:          make(chan struct{}),
 		shutdownRequest:  make(chan struct{}),
 		shutdownComplete: make(chan struct{}),
 	}
@@ -52,12 +56,14 @@ func NewDaemon(addr string, port int, debug, verbose bool) (*Daemon, error) {
 
 func (d *Daemon) Start() error {
 
-	go runServer(d.Address, d.Port, d.shutdownRequest, d.shutdownComplete)
-
-	// Ensure the program is run with a Windows GUI context
-	runtime.LockOSThread()
-	systray.Run(d.onReady, d.onExit)
-
+	go runServer(d)
+	title := fmt.Sprintf("%s v%s", d.Name, d.Version)
+	menu, err := NewMenu(title, d.shutdownRequest, d.shutdownComplete)
+	if err != nil {
+		return err
+	}
+	d.menu = menu
+	<-d.started
 	return nil
 }
 
@@ -65,34 +71,6 @@ func (d *Daemon) Stop() error {
 	d.shutdownRequest <- struct{}{}
 	<-d.shutdownComplete
 	return nil
-}
-
-func (d *Daemon) onReady() {
-	// Set the icon and tooltip
-	title := fmt.Sprintf("winexec v%s", Version)
-	systray.SetTitle(title)
-	systray.SetTooltip(title)
-	systray.SetIcon(iconData)
-
-	// Add menu items
-	mQuit := systray.AddMenuItem(fmt.Sprintf("Quit %v", title), "Shutdown and exit")
-
-	// Handle menu item clicks
-	go func() {
-		for {
-			select {
-			case <-mQuit.ClickedCh:
-				systray.Quit()
-			}
-		}
-	}()
-
-}
-
-func (d *Daemon) onExit() {
-	// Clean up here
-	d.shutdownRequest <- struct{}{}
-	<-d.shutdownComplete
 }
 
 type FailResponse struct {
@@ -124,11 +102,11 @@ type SpawnResponse struct {
 	ExitCode int
 }
 
-func fail(w http.ResponseWriter, message string) {
+func fail(w http.ResponseWriter, r *http.Request, message string) {
 	status := http.StatusBadRequest
 	response := FailResponse{false, message}
 	if Verbose {
-		log.Printf(" fail: [%d] %s\n", status, message)
+		log.Printf("%s <- [%d] %s\n", r.RemoteAddr, status, message)
 	}
 	w.WriteHeader(status)
 	err := json.NewEncoder(w).Encode(&response)
@@ -137,18 +115,21 @@ func fail(w http.ResponseWriter, message string) {
 	}
 }
 
-func succeed(w http.ResponseWriter, response interface{}) {
+func succeed(w http.ResponseWriter, r *http.Request, response interface{}) {
 	if Verbose {
-		log.Printf("  response: [200] %+v\n", response)
+		log.Printf("%s <- [200] %+v\n", r.RemoteAddr, response)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
-		fail(w, err.Error())
+		fail(w, r, err.Error())
 	}
 }
 
 func handleExec(w http.ResponseWriter, r *http.Request) {
+	if Verbose {
+		log.Printf("%v\n", r)
+	}
 	var request ExecRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
@@ -158,7 +139,7 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 
 	exit, stdout, stderr, err := run(request.Command, request.Args...)
 	if err != nil {
-		fail(w, err.Error())
+		fail(w, r, err.Error())
 		return
 	}
 	response := ExecResponse{
@@ -168,10 +149,13 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 		stdout,
 		stderr,
 	}
-	succeed(w, &response)
+	succeed(w, r, &response)
 }
 
 func handleSpawn(w http.ResponseWriter, r *http.Request) {
+	if Verbose {
+		log.Printf("%v\n", r)
+	}
 	var request ExecRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
@@ -182,7 +166,7 @@ func handleSpawn(w http.ResponseWriter, r *http.Request) {
 	command := append([]string{request.Command}, request.Args...)
 	exitCode, err := spawn(strings.Join(command, " "))
 	if err != nil {
-		fail(w, err.Error())
+		fail(w, r, err.Error())
 		return
 	}
 	response := SpawnResponse{
@@ -190,22 +174,40 @@ func handleSpawn(w http.ResponseWriter, r *http.Request) {
 		request.Command,
 		exitCode,
 	}
-	succeed(w, &response)
+	succeed(w, r, &response)
 }
 
 func handlePing(w http.ResponseWriter, r *http.Request) {
+	if Verbose {
+		log.Printf("%s -> %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
+	}
 	response := PingResponse{true, "pong"}
-	succeed(w, &response)
+	succeed(w, r, &response)
 }
 
-func runServer(addr string, port int, ShutdownRequest, ShutdownComplete chan struct{}) {
+func (d *Daemon) pemFile(name string) ([]byte, error) {
+	filename := viper.GetString(d.Name + "." + name)
+	if filename == "" {
+		return certs.ReadFile("certs/" + name + ".pem")
+	}
+	if strings.HasPrefix(filename, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return []byte{}, err
+		}
+		filename = filepath.Join(home, filename[1:])
+	}
+	return os.ReadFile(filename)
+}
 
-	serverCertPEM, err := certs.ReadFile("certs/cert.pem")
+func runServer(d *Daemon) {
+
+	serverCertPEM, err := d.pemFile("cert")
 	if err != nil {
 		log.Fatalf("Failed reading server certificate: %v", err)
 	}
 
-	serverKeyPEM, err := certs.ReadFile("certs/key.pem")
+	serverKeyPEM, err := d.pemFile("key")
 	if err != nil {
 		log.Fatalf("Failed reading server certificate key: %v", err)
 	}
@@ -215,7 +217,7 @@ func runServer(addr string, port int, ShutdownRequest, ShutdownComplete chan str
 		log.Fatalf("Failed creating X509 keypair: %v", err)
 	}
 
-	caCertPEM, err := certs.ReadFile("certs/ca.pem")
+	caCertPEM, err := d.pemFile("ca")
 	if err != nil {
 		log.Fatalf("Failed reading CA file: %v", err)
 	}
@@ -232,7 +234,7 @@ func runServer(addr string, port int, ShutdownRequest, ShutdownComplete chan str
 		ClientCAs:    caCertPool,
 	}
 
-	listen := fmt.Sprintf("%s:%d", addr, port)
+	listen := fmt.Sprintf("%s:%d", d.Address, d.Port)
 	server := http.Server{
 		Addr:      listen,
 		TLSConfig: tlsConfig,
@@ -242,17 +244,19 @@ func runServer(addr string, port int, ShutdownRequest, ShutdownComplete chan str
 	http.HandleFunc("POST /exec/", handleExec)
 	http.HandleFunc("POST /spawn/", handleSpawn)
 
+	log.Printf("%s v%s server listening on %s\n", d.Name, d.Version, server.Addr)
 	go func() {
-		log.Printf("%s v%s listening on %s\n", serverName, Version, listen)
 		err := server.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalln("ServeTLS failed: ", err)
 		}
 	}()
 
-	<-ShutdownRequest
+	d.started <- struct{}{}
 
-	log.Println("shutting down")
+	<-d.shutdownRequest
+	log.Println("received shutdown request")
+
 	ctx, cancel := context.WithTimeout(context.Background(), SHUTDOWN_TIMEOUT*time.Second)
 	defer cancel()
 
@@ -260,8 +264,8 @@ func runServer(addr string, port int, ShutdownRequest, ShutdownComplete chan str
 	if err != nil {
 		log.Fatalln("Server Shutdown failed: ", err)
 	}
-	log.Println("shutdown complete")
-	ShutdownComplete <- struct{}{}
+	log.Println("server shutdown complete")
+	d.shutdownComplete <- struct{}{}
 }
 
 func spawn(command string) (int, error) {
