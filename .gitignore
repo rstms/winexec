@@ -3,3 +3,6 @@ winexec.exe
 *.crt
 *.key
 *.pem
+.postactivate
+*.core
+notes

@@ -1,24 +1,21 @@
 # go makefile
 
-ifeq ($(GITHUB_TOKEN),)
-$(error GITHUB_TOKEN unset)
-endif
-
 program != basename $$(pwd)
-
-latest_release != gh release list --json tagName --jq ".[0].tagName" | tr -d v
+go_version = go1.24.5
 version != cat VERSION
-
-gitclean = $(if $(shell git status --porcelain),$(error git status is dirty),)
+latest_release != gh release list --json tagName --jq '.[0].tagName' | tr -d v
+gitclean = $(if $(shell git status --porcelain),$(error git status is dirty),$(info git status is clean))
+rstms_modules = $(shell awk <go.mod '/^module/{next} /rstms/{print $$1}')
+$(program): build
 
 build: fmt
-	fix go build
+	CGO_ENABLED=1 fix go build
 
 fmt: go.sum
 	fix go fmt . ./...
 
 go.mod:
-	go mod init
+	$(go_version) mod init
 
 go.sum: go.mod
 	go mod tidy
@@ -26,24 +23,33 @@ go.sum: go.mod
 install: build
 	go install
 
-test:
-	fix -- go test -failfast -v .
-	fix -- go test -failfast -v ./...
+test: fmt
+	go test -v -failfast . ./...
 
-release: build
+debug: fmt
+	go test -v -failfast -count=1 -run $(test) . ./...
+
+release:
 	$(gitclean)
+	@$(if $(update),gh release delete -y v$(version),)
 	gh release create v$(version) --notes "v$(version)"
 
-testclean:
-	rm -f testdata/*.out
-	rm -f testdata/*.err
+latest_module_release = $(shell gh --repo $(1) release list --json tagName --jq '.[0].tagName')
 
-clean: testclean
-	rm -f $(program)
+update:
+	@echo checking dependencies for updated versions 
+	@$(foreach module,$(rstms_modules),go get $(module)@$(call latest_module_release,$(module));)
+
+logclean: 
+	echo >/var/log/boxen
+
+clean: logclean
+	rm -f $(program) *.core 
 	go clean
 
 sterile: clean
-	go clean -r
+	which $(program) && go clean -i || true
+	go clean
 	go clean -cache
 	go clean -modcache
 	rm -f go.mod go.sum

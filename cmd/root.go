@@ -28,10 +28,53 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 */
-package main
+package cmd
 
-import "github.com/rstms/winexec/cmd"
+import (
+	"bufio"
+	"fmt"
+	"github.com/rstms/winexec/server"
+	"github.com/spf13/cobra"
+	"os"
+)
 
-func main() {
-	cmd.Execute()
+var cfgFile string
+
+var rootCmd = &cobra.Command{
+	Use:   "winexec",
+	Short: "user session remote command execution daemon",
+	Long: `
+Run an HTTPS server under the logged-in 'on the glass' user sesssion.
+Endpoints provide authorized clients to execute a command line in this
+context.  Any GUI programs started interact with the desktop as expected.
+An icon is displated in the 'task notification area'.
+`,
+	Run: func(cmd *cobra.Command, args []string) {
+		addr := ViperGetString("addr")
+		port := ViperGetInt("port")
+		debug := ViperGetBool("debug")
+		verbose := ViperGetBool("verbose")
+		daemon, err := server.NewDaemon(addr, port, verbose, debug)
+		err = daemon.Start()
+		fmt.Printf("Hit ENTER to shutdown")
+		reader := bufio.NewReader(os.Stdin)
+		_, err = reader.ReadString('\n')
+		cobra.CheckErr(err)
+		err = daemon.Stop()
+		cobra.CheckErr(err)
+	},
+}
+
+func Execute() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+func init() {
+	cobra.OnInitialize(InitConfig)
+	OptionString(rootCmd, "config", "c", "", "config file")
+	OptionString(rootCmd, "logfile", "l", "", "log filename")
+	OptionSwitch(rootCmd, "debug", "d", "enable debug diagnostics")
+	OptionSwitch(rootCmd, "verbose", "v", "enable diagnostic output")
 }
