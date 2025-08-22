@@ -23,7 +23,7 @@ var certs embed.FS
 
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
-const Version = "1.0.2"
+const Version = "1.0.3"
 
 var Verbose bool
 var Debug bool
