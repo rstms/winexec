@@ -31,6 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
+	"embed"
 	"fmt"
 	common "github.com/rstms/go-common"
 	"github.com/rstms/winexec/server"
@@ -41,6 +42,9 @@ import (
 )
 
 var cfgFile string
+
+//go:embed certs/*
+var certs embed.FS
 
 var rootCmd = &cobra.Command{
 	Use:     "winexec",
@@ -53,7 +57,7 @@ context.  Any GUI programs started interact with the desktop as expected.
 An icon is displated in the 'task notification area'.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		daemon, err := server.NewDaemon(cmd.Name())
+		daemon, err := server.NewDaemon(cmd.Name(), certs)
 		cobra.CheckErr(err)
 		err = daemon.Start()
 		cobra.CheckErr(err)

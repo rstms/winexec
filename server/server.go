@@ -18,9 +18,6 @@ import (
 	"time"
 )
 
-//go:embed certs/*
-var certs embed.FS
-
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
 const Version = "1.0.6"
@@ -37,9 +34,10 @@ type Daemon struct {
 	shutdownRequest  chan struct{}
 	shutdownComplete chan struct{}
 	menu             *Menu
+	certs            embed.FS
 }
 
-func NewDaemon(name string) (*Daemon, error) {
+func NewDaemon(name string, certs embed.FS) (*Daemon, error) {
 	Verbose = viper.GetBool(name + ".verbose")
 	Debug = viper.GetBool(name + ".debug")
 	d := Daemon{
@@ -50,6 +48,7 @@ func NewDaemon(name string) (*Daemon, error) {
 		started:          make(chan struct{}),
 		shutdownRequest:  make(chan struct{}),
 		shutdownComplete: make(chan struct{}),
+		certs:            certs,
 	}
 	return &d, nil
 }
@@ -194,7 +193,7 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) pemFile(name string) ([]byte, error) {
 	filename := viper.GetString(d.Name + "." + name)
 	if filename == "" {
-		return certs.ReadFile("certs/" + name + ".pem")
+		return d.certs.ReadFile("certs/" + name + ".pem")
 	}
 	if strings.HasPrefix(filename, "~") {
 		home, err := os.UserHomeDir()
