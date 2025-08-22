@@ -20,7 +20,7 @@ import (
 
 const defaultPort = 10080
 const SHUTDOWN_TIMEOUT = 5
-const Version = "1.0.6"
+const Version = "1.0.7"
 
 var Verbose bool
 var Debug bool
