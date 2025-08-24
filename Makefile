@@ -56,4 +56,4 @@ sterile: clean
 	rm -f go.mod go.sum
 
 certs:
-	$(if $(SYSTEMROOT),scripts/generate_certs.cmd,scripts/generate_certs)
+	scripts/generate_certs

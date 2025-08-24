@@ -1,5 +1,8 @@
 #!/bin/sh
-
+if [ -n "$SYSTEMROOT" ]; then
+    echo 'run scripts\generate_certs.cmd'
+    exit
+fi
 program=$(basename $(pwd))
 dir=$HOME/.config/$program
 config=$dir/config.yaml
