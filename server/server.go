@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/viper"
@@ -13,48 +12,89 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
-const defaultPort = 10080
-const SHUTDOWN_TIMEOUT = 5
 const Version = "1.0.7"
+
+const DEFAULT_BIND_ADDRESS = "127.0.0.1"
+const DEFAULT_HTTPS_PORT = 10080
+const DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 5
 
 var Verbose bool
 var Debug bool
 
 type Daemon struct {
-	Name             string
-	Address          string
-	Version          string
-	Port             int
-	started          chan struct{}
-	shutdownRequest  chan struct{}
-	shutdownComplete chan struct{}
-	menu             *Menu
-	certs            embed.FS
+	Name                   string
+	Address                string
+	Version                string
+	Port                   int
+	started                chan struct{}
+	shutdownRequest        chan struct{}
+	shutdownComplete       chan struct{}
+	menu                   *Menu
+	ca                     string
+	cert                   string
+	key                    string
+	shutdownTimeoutSeconds int
+	debug                  bool
+	verbose                bool
+	viperPrefix            string
 }
 
-func NewDaemon(name string, certs embed.FS) (*Daemon, error) {
-	Verbose = viper.GetBool(name + ".verbose")
-	Debug = viper.GetBool(name + ".debug")
-	d := Daemon{
-		Name:             name,
-		Address:          viper.GetString(name + ".address"),
-		Port:             viper.GetInt(name + ".port"),
-		Version:          Version,
-		started:          make(chan struct{}),
-		shutdownRequest:  make(chan struct{}),
-		shutdownComplete: make(chan struct{}),
-		certs:            certs,
+func NewDaemon(viperKey string) (*Daemon, error) {
+	if viperKey == "" {
+		viperKey = "winexec"
 	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	viper.SetDefault(viperKey+".bind_address", DEFAULT_BIND_ADDRESS)
+	viper.SetDefault(viperKey+".https_port", DEFAULT_HTTPS_PORT)
+	viper.SetDefault(viperKey+".ca", filepath.Join(configDir, "winexec", "ca.pem"))
+	viper.SetDefault(viperKey+".cert", filepath.Join(configDir, "winexec", "cert.pem"))
+	viper.SetDefault(viperKey+".key", filepath.Join(configDir, "winexec", "key.pem"))
+	viper.SetDefault(viperKey+".shutdown_timeout_seconds", DEFAULT_SHUTDOWN_TIMEOUT_SECONDS)
+	viper.SetDefault(viperKey+".debug", false)
+	viper.SetDefault(viperKey+".verbose", false)
+
+	d := Daemon{
+		Name:                   "winexec",
+		Address:                viper.GetString(viperKey + ".bind_address"),
+		Port:                   viper.GetInt(viperKey + ".https_port"),
+		Version:                Version,
+		started:                make(chan struct{}),
+		shutdownRequest:        make(chan struct{}),
+		shutdownComplete:       make(chan struct{}),
+		debug:                  viper.GetBool(viperKey + ".debug"),
+		verbose:                viper.GetBool(viperKey + ".verbose"),
+		ca:                     viper.GetString(viperKey + ".ca"),
+		cert:                   viper.GetString(viperKey + ".cert"),
+		key:                    viper.GetString(viperKey + ".key"),
+		shutdownTimeoutSeconds: viper.GetInt(viperKey + ".shutdown_timeout_seconds"),
+		viperPrefix:            viperKey,
+	}
+	Verbose = d.verbose
+	Debug = d.debug
 	return &d, nil
 }
 
-func (d *Daemon) Start() error {
+func (d *Daemon) GetConfig() map[string]any {
+	cfg := make(map[string]any)
+	for _, key := range viper.AllKeys() {
+		if strings.HasPrefix(key, d.viperPrefix+".") {
+			cfg[key] = viper.Get(key)
+		}
+	}
+	return cfg
+}
 
+func (d *Daemon) Start() error {
 	go runServer(d)
 	title := fmt.Sprintf("%s v%s", d.Name, d.Version)
 	menu, err := NewMenu(title, d.shutdownRequest, d.shutdownComplete)
@@ -69,6 +109,24 @@ func (d *Daemon) Start() error {
 func (d *Daemon) Stop() error {
 	d.shutdownRequest <- struct{}{}
 	<-d.shutdownComplete
+	return nil
+}
+
+func (d *Daemon) Run(message string) error {
+	err := d.Start()
+	if err != nil {
+		return err
+	}
+	sigint := make(chan os.Signal)
+	signal.Notify(sigint, syscall.SIGINT)
+	if message != "" {
+		fmt.Println(message)
+	}
+	<-sigint
+	err = d.Stop()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -190,31 +248,26 @@ func handlePing(w http.ResponseWriter, r *http.Request) {
 	succeed(w, r, &response)
 }
 
-func (d *Daemon) pemFile(name string) ([]byte, error) {
-	filename := viper.GetString(d.Name + "." + name)
-	if filename == "" {
-		return d.certs.ReadFile("certs/" + name + ".pem")
-	}
+func readPEM(filename string) ([]byte, error) {
+	filename = filepath.Clean(filename)
 	if strings.HasPrefix(filename, "~") {
-		home, err := os.UserHomeDir()
+		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return []byte{}, err
 		}
-		filename = filepath.Join(home, filename[1:])
+		filename = filepath.Join(homeDir, filename[1:])
 	}
-	filename = filepath.Clean(filename)
-	log.Printf("Certificate %s: %s\n", name, filename)
 	return os.ReadFile(filename)
 }
 
 func runServer(d *Daemon) {
 
-	serverCertPEM, err := d.pemFile("cert")
+	serverCertPEM, err := readPEM(d.cert)
 	if err != nil {
 		log.Fatalf("Failed reading server certificate: %v", err)
 	}
 
-	serverKeyPEM, err := d.pemFile("key")
+	serverKeyPEM, err := readPEM(d.key)
 	if err != nil {
 		log.Fatalf("Failed reading server certificate key: %v", err)
 	}
@@ -224,7 +277,7 @@ func runServer(d *Daemon) {
 		log.Fatalf("Failed creating X509 keypair: %v", err)
 	}
 
-	caCertPEM, err := d.pemFile("ca")
+	caCertPEM, err := readPEM(d.ca)
 	if err != nil {
 		log.Fatalf("Failed reading CA file: %v", err)
 	}
@@ -251,11 +304,11 @@ func runServer(d *Daemon) {
 	http.HandleFunc("POST /exec/", handleExec)
 	http.HandleFunc("POST /spawn/", handleSpawn)
 
-	log.Printf("%s v%s server listening on %s\n", d.Name, d.Version, server.Addr)
+	log.Printf("%s v%s server listening on %s in TLS mode\n", d.Name, d.Version, server.Addr)
 	go func() {
 		err := server.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalln("ServeTLS failed: ", err)
+			log.Fatalf("ServeTLS failed: %v", err)
 		}
 	}()
 
@@ -264,7 +317,7 @@ func runServer(d *Daemon) {
 	<-d.shutdownRequest
 	log.Println("received shutdown request")
 
-	ctx, cancel := context.WithTimeout(context.Background(), SHUTDOWN_TIMEOUT*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(d.shutdownTimeoutSeconds)*time.Second)
 	defer cancel()
 
 	err = server.Shutdown(ctx)

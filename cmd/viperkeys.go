@@ -31,52 +31,39 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
-	common "github.com/rstms/go-common"
-	"github.com/rstms/winexec/server"
+	"fmt"
+
 	"github.com/spf13/cobra"
-	"os"
 )
 
-var Server *server.Daemon
+// viperkeysCmd represents the viperkeys command
+var viperkeysCmd = &cobra.Command{
+	Use:   "viperkeys",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
 
-var rootCmd = &cobra.Command{
-	Use:     "winexec",
-	Version: server.Version,
-	Short:   "user session remote command execution daemon",
-	Long: `
-Run an HTTPS server under the logged-in 'on the glass' user sesssion.
-Endpoints provide authorized clients to execute a command line in this
-context.  Any GUI programs started interact with the desktop as expected.
-An icon is displated in the 'task notification area'.
-`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		d, err := server.NewDaemon("winexec")
-		cobra.CheckErr(err)
-		Server = d
-	},
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := Server.Run("CTRL-C to shutdown")
-		cobra.CheckErr(err)
+		cfg := Server.GetConfig()
+		for k, v := range cfg {
+			fmt.Printf("%s: %v\n", k, v)
+		}
 	},
-}
-
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
 }
 
 func init() {
-	common.Init("winexec", server.Version)
-	cobra.OnInitialize(InitConfig)
-	OptionString(rootCmd, "config", "c", "", "config file")
-	OptionString(rootCmd, "bind-address", "a", "127.0.0.1", "bind address")
-	OptionString(rootCmd, "https-port", "p", "10080", "listen port")
-	OptionString(rootCmd, "ca", "", "", "certificate authority PEM file")
-	OptionString(rootCmd, "cert", "", "", "server certificate PEM file")
-	OptionString(rootCmd, "key", "", "", "server certificate key PEM file")
-	OptionString(rootCmd, "logfile", "l", "", "log filename")
-	OptionSwitch(rootCmd, "debug", "d", "enable debug diagnostics")
-	OptionSwitch(rootCmd, "verbose", "v", "enable diagnostic output")
+	rootCmd.AddCommand(viperkeysCmd)
+
+	// Here you will define your flags and configuration settings.
+
+	// Cobra supports Persistent Flags which will work for this command
+	// and all subcommands, e.g.:
+	// viperkeysCmd.PersistentFlags().String("foo", "", "A help for foo")
+
+	// Cobra supports local flags which will only run when this command
+	// is called directly, e.g.:
+	// viperkeysCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

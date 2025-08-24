@@ -1,0 +1,20 @@
+#!/bin/sh
+
+program=$(basename $(pwd))
+dir=$HOME/.config/$program
+config=$dir/config.yaml
+mkdir -p $dir
+echo updating certificates in $dir
+(
+    cd $dir
+    mkcert --force --chain ca.pem
+    mkcert --force 127.0.0.1 --cert-file cert.pem --key-file key.pem --duration 10y -- --san localhost
+)
+touch $config
+echo adding ceritifcates to config file $config
+for name in ca cert key; do
+    cmd='/\s*'${name}':.*/d'
+    sed -i -e "$cmd" $config
+    printf >>$config '  %s: ~/.config/%s/%s.pem\n' "$name" "$program" "$name"
+done
+cat $config
