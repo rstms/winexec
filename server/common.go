@@ -1,6 +1,6 @@
 // go-common local proxy functions
 
-package cmd
+package server
 
 import (
 	common "github.com/rstms/go-common"
