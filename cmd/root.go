@@ -31,7 +31,6 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
-	common "github.com/rstms/go-common"
 	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
 	"os"
@@ -66,17 +65,11 @@ func Execute() {
 		os.Exit(1)
 	}
 }
-
 func init() {
-	common.Init("winexec", server.Version)
-	cobra.OnInitialize(InitConfig)
-	OptionString(rootCmd, "config", "c", "", "config file")
+	CobraInit(rootCmd)
 	OptionString(rootCmd, "bind-address", "a", "127.0.0.1", "bind address")
 	OptionString(rootCmd, "https-port", "p", "10080", "listen port")
 	OptionString(rootCmd, "ca", "", "", "certificate authority PEM file")
 	OptionString(rootCmd, "cert", "", "", "server certificate PEM file")
 	OptionString(rootCmd, "key", "", "", "server certificate key PEM file")
-	OptionString(rootCmd, "logfile", "l", "", "log filename")
-	OptionSwitch(rootCmd, "debug", "d", "enable debug diagnostics")
-	OptionSwitch(rootCmd, "verbose", "v", "enable diagnostic output")
 }
