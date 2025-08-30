@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const Version = "1.0.10"
+const Version = "1.0.11"
 
 const DEFAULT_BIND_ADDRESS = "127.0.0.1"
 const DEFAULT_HTTPS_PORT = 10080
