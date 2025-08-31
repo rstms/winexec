@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-type Client struct {
+type WinexecClient struct {
 	api   APIClient
 	debug bool
 }
@@ -21,7 +21,7 @@ func viperPrefix() string {
 	return prefix
 }
 
-func NewClient() (*Client, error) {
+func NewWinexecClient() (*WinexecClient, error) {
 
 	prefix := viperPrefix()
 	url := ViperGetString(prefix + "url")
@@ -31,7 +31,7 @@ func NewClient() (*Client, error) {
 	debug := ViperGetBool(prefix + "debug")
 
 	if ViperGetBool("verbose") {
-		log.Printf("NewWinExecClient: %s\n", FormatJSON(&map[string]any{
+		log.Printf("NewWinexecClient: %s\n", FormatJSON(&map[string]any{
 			"url":   url,
 			"cert":  cert,
 			"key":   key,
@@ -44,7 +44,7 @@ func NewClient() (*Client, error) {
 	if err != nil {
 		return nil, Fatal(err)
 	}
-	client := Client{
+	client := WinexecClient{
 		api:   api,
 		debug: debug,
 	}
@@ -53,7 +53,7 @@ func NewClient() (*Client, error) {
 
 }
 
-func (c *Client) GetConfig() map[string]any {
+func (c *WinexecClient) GetConfig() map[string]any {
 	prefix := ViperKey(viperPrefix()) + "."
 	cfg := make(map[string]any)
 	for _, key := range viper.AllKeys() {
@@ -64,7 +64,7 @@ func (c *Client) GetConfig() map[string]any {
 	return cfg
 }
 
-func (c *Client) Spawn(command string, exitCode *int) error {
+func (c *WinexecClient) Spawn(command string, exitCode *int) error {
 	if c.debug {
 		log.Printf("winexec Spawn(%s)\n", command)
 	}
@@ -91,7 +91,7 @@ func (c *Client) Spawn(command string, exitCode *int) error {
 	return nil
 }
 
-func (c *Client) Exec(command string, args []string, exitCode *int) (string, string, error) {
+func (c *WinexecClient) Exec(command string, args []string, exitCode *int) (string, string, error) {
 	if c.debug {
 		log.Printf("winexec Exec(%s %v)\n", command, args)
 	}
@@ -118,7 +118,7 @@ func (c *Client) Exec(command string, args []string, exitCode *int) (string, str
 	return response.Stdout, response.Stderr, nil
 }
 
-func (c *Client) Upload(dst, src string) error {
+func (c *WinexecClient) Upload(dst, src string) error {
 	if c.debug {
 		log.Printf("winexec Upload(%s %s)\n", dst, src)
 	}
@@ -155,7 +155,7 @@ func (c *Client) Upload(dst, src string) error {
 	return nil
 }
 
-func (c *Client) Download(dst, src string) error {
+func (c *WinexecClient) Download(dst, src string) error {
 	if c.debug {
 		log.Printf("winexec Download(%s %s)\n", dst, src)
 	}
@@ -183,7 +183,7 @@ func (c *Client) Download(dst, src string) error {
 	return nil
 }
 
-func (c *Client) GetISO(dst, url, ca, cert, key string) error {
+func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 	if c.debug {
 		log.Printf("winexec GetISO(%s %s %s %s %s)\n", dst, url, ca, cert, key)
 	}
