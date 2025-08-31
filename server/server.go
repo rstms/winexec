@@ -84,7 +84,7 @@ func NewWinexecServer() (*Daemon, error) {
 	Verbose = d.verbose
 	Debug = d.debug
 	if Debug {
-	    log.Printf("winexec server config: %s\n", FormatJSON(GetConfig()))
+		log.Printf("winexec server config: %s\n", FormatJSON(d.GetConfig()))
 	}
 	return &d, nil
 }
