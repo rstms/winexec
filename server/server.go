@@ -52,7 +52,7 @@ func viperPrefix() string {
 	return prefix
 }
 
-func NewDaemon() (*Daemon, error) {
+func NewWinexecServer() (*Daemon, error) {
 	prefix := viperPrefix()
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
@@ -83,6 +83,9 @@ func NewDaemon() (*Daemon, error) {
 	}
 	Verbose = d.verbose
 	Debug = d.debug
+	if Debug {
+	    log.Printf("winexec server config: %s\n", FormatJSON(GetConfig()))
+	}
 	return &d, nil
 }
 
