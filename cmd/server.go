@@ -31,9 +31,14 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
 )
 
 var serverCmd = &cobra.Command{
@@ -55,9 +60,41 @@ to quickly create a Cobra application.`,
 		if ViperGetBool("verbose") {
 			message = "CTRL-C to shutdown"
 		}
+		runCommand("startup")
+		defer runCommand("shutdown")
 		err = daemon.Run(message)
 		cobra.CheckErr(err)
 	},
+}
+
+func runCommand(state string) {
+	key := "server." + state + "_command"
+	binary := ViperGetString(key)
+	if binary == "" {
+		return
+	}
+	args := ViperGetStringSlice(key + "_args")
+	command := exec.Command(binary, args...)
+	var obuf bytes.Buffer
+	var ebuf bytes.Buffer
+	command.Stdout = &obuf
+	command.Stderr = &ebuf
+	if ViperGetBool("verbose") {
+		log.Printf("running %s: %v\n", key, command)
+	}
+	err := command.Run()
+	if ViperGetBool("verbose") {
+		ostr := strings.TrimSpace(obuf.String())
+		if ostr != "" {
+			fmt.Fprintf(os.Stdout, "%s stdout: %s\n", key, ostr)
+		}
+		estr := strings.TrimSpace(ebuf.String())
+		if estr != "" {
+			fmt.Fprintf(os.Stderr, "%s stderr: %s\n", key, estr)
+		}
+	}
+	cobra.CheckErr(err)
+
 }
 
 func init() {
