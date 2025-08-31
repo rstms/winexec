@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/getlantern/systray"
+	"log"
 	"runtime"
 )
 
@@ -52,6 +53,7 @@ func (m *Menu) onReady() {
 }
 
 func (m *Menu) onExit() {
+	log.Printf("onExit: received gui shutdown event\n")
 	m.shutdownRequest <- struct{}{}
-	<-m.shutdownComplete
+	log.Printf("onExit: shutdown requested\n")
 }

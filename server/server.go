@@ -98,20 +98,26 @@ func (d *Daemon) GetConfig() map[string]any {
 }
 
 func (d *Daemon) Start() error {
+	log.Println("callingRunServer")
 	go runServer(d)
+	log.Println("awaiting 'started' message...")
+	<-d.started
+	log.Println("received 'started' message")
 	title := fmt.Sprintf("%s v%s", d.Name, d.Version)
 	menu, err := NewMenu(title, d.shutdownRequest, d.shutdownComplete)
 	if err != nil {
 		return err
 	}
 	d.menu = menu
-	<-d.started
 	return nil
 }
 
 func (d *Daemon) Stop() error {
+	log.Println("Stop: sending 'shutdownRequest' message")
 	d.shutdownRequest <- struct{}{}
+	log.Println("Stop: awaiting 'shutdownComplete' message...")
 	<-d.shutdownComplete
+	log.Println("Stop: received 'shutdownComplete' message")
 	return nil
 }
 
@@ -125,10 +131,15 @@ func (d *Daemon) Run(message string) error {
 	if message != "" {
 		fmt.Println(message)
 	}
-	<-sigint
-	err = d.Stop()
-	if err != nil {
-		return err
+	select {
+	case <-sigint:
+		log.Println("Run: received SIGINT")
+		err = d.Stop()
+		if err != nil {
+			return err
+		}
+	case <-d.shutdownComplete:
+		log.Println("Run: received shutdownComplete")
 	}
 	return nil
 }
@@ -226,10 +237,19 @@ func runServer(d *Daemon) {
 		}
 	}()
 
+	log.Println("runServer: sending 'started'")
 	d.started <- struct{}{}
+	log.Println("runServer: sent 'started'")
 
+	defer func() {
+		log.Println("runServer.exit: sending 'shutdownComplete'")
+		d.shutdownComplete <- struct{}{}
+		log.Println("runServer.exit: sent 'shutdownComplete'")
+	}()
+
+	log.Println("runServer: awaiting 'shutdownRequest'")
 	<-d.shutdownRequest
-	log.Println("received shutdown request")
+	log.Println("runServer: received 'shutdownRequest'")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(d.shutdownTimeoutSeconds)*time.Second)
 	defer cancel()
@@ -238,6 +258,4 @@ func runServer(d *Daemon) {
 	if err != nil {
 		log.Fatalln("Server Shutdown failed: ", err)
 	}
-	log.Println("server shutdown complete")
-	d.shutdownComplete <- struct{}{}
 }
