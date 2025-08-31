@@ -42,41 +42,44 @@ type Daemon struct {
 	shutdownTimeoutSeconds int
 	debug                  bool
 	verbose                bool
-	viperPrefix            string
 }
 
-func NewDaemon(viperKey string) (*Daemon, error) {
-	if viperKey == "" {
-		viperKey = "winexec"
+func viperPrefix() string {
+	prefix := "winexec.server."
+	if ProgramName() == "winexec" {
+		prefix = "server."
 	}
-	configDir, err := os.UserConfigDir()
+	return prefix
+}
+
+func NewDaemon() (*Daemon, error) {
+	prefix := viperPrefix()
+	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
-	viper.SetDefault(viperKey+".bind_address", DEFAULT_BIND_ADDRESS)
-	viper.SetDefault(viperKey+".https_port", DEFAULT_HTTPS_PORT)
-	viper.SetDefault(viperKey+".ca", filepath.Join(configDir, "winexec", "ca.pem"))
-	viper.SetDefault(viperKey+".cert", filepath.Join(configDir, "winexec", "cert.pem"))
-	viper.SetDefault(viperKey+".key", filepath.Join(configDir, "winexec", "key.pem"))
-	viper.SetDefault(viperKey+".shutdown_timeout_seconds", DEFAULT_SHUTDOWN_TIMEOUT_SECONDS)
-	viper.SetDefault(viperKey+".debug", false)
-	viper.SetDefault(viperKey+".verbose", false)
+	configDir := filepath.Join(userConfigDir, "winexec")
+	ViperSetDefault(prefix+"bind_address", DEFAULT_BIND_ADDRESS)
+	ViperSetDefault(prefix+"https_port", DEFAULT_HTTPS_PORT)
+	ViperSetDefault(prefix+"ca", filepath.Join(configDir, "ca.pem"))
+	ViperSetDefault(prefix+"cert", filepath.Join(configDir, "cert.pem"))
+	ViperSetDefault(prefix+"key", filepath.Join(configDir, "key.pem"))
+	ViperSetDefault(prefix+"shutdown_timeout_seconds", DEFAULT_SHUTDOWN_TIMEOUT_SECONDS)
 
 	d := Daemon{
 		Name:                   "winexec",
-		Address:                viper.GetString(viperKey + ".bind_address"),
-		Port:                   viper.GetInt(viperKey + ".https_port"),
+		Address:                ViperGetString(prefix + "bind_address"),
+		Port:                   ViperGetInt(prefix + "https_port"),
 		Version:                Version,
 		started:                make(chan struct{}),
 		shutdownRequest:        make(chan struct{}),
 		shutdownComplete:       make(chan struct{}),
-		debug:                  viper.GetBool(viperKey + ".debug"),
-		verbose:                viper.GetBool(viperKey + ".verbose"),
-		ca:                     viper.GetString(viperKey + ".ca"),
-		cert:                   viper.GetString(viperKey + ".cert"),
-		key:                    viper.GetString(viperKey + ".key"),
-		shutdownTimeoutSeconds: viper.GetInt(viperKey + ".shutdown_timeout_seconds"),
-		viperPrefix:            viperKey,
+		debug:                  ViperGetBool("debug"),
+		verbose:                ViperGetBool("verbose"),
+		ca:                     ViperGetString(prefix + "ca"),
+		cert:                   ViperGetString(prefix + "cert"),
+		key:                    ViperGetString(prefix + "key"),
+		shutdownTimeoutSeconds: ViperGetInt(prefix + "shutdown_timeout_seconds"),
 	}
 	Verbose = d.verbose
 	Debug = d.debug
@@ -84,9 +87,10 @@ func NewDaemon(viperKey string) (*Daemon, error) {
 }
 
 func (d *Daemon) GetConfig() map[string]any {
+	prefix := ViperKey(viperPrefix())
 	cfg := make(map[string]any)
 	for _, key := range viper.AllKeys() {
-		if strings.HasPrefix(key, d.viperPrefix+".") {
+		if strings.HasPrefix(key, prefix) {
 			cfg[key] = viper.Get(key)
 		}
 	}

@@ -31,31 +31,40 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
+	"fmt"
 	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
-	"os"
 )
 
-var Server *server.Daemon
+var serverCmd = &cobra.Command{
+	Use:   "server",
+	Short: "A brief description of your command",
+	Long: `A longer description that spans multiple lines and likely contains examples
+and usage of using your command. For example:
 
-var rootCmd = &cobra.Command{
-	Use:     "winexec",
-	Version: server.Version,
-	Short:   "user session remote command execution daemon",
-	Long: `
-Run an HTTPS server under the logged-in 'on the glass' user sesssion.
-Endpoints provide authorized clients to execute a command line in this
-context.  Any GUI programs started interact with the desktop as expected.
-An icon is displated in the 'task notification area'.
-`,
+Cobra is a CLI library for Go that empowers applications.
+This application is a tool to generate the needed files
+to quickly create a Cobra application.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		daemon, err := server.NewDaemon()
+		cobra.CheckErr(err)
+		if ViperGetBool("debug") {
+			fmt.Println(FormatJSON(daemon.GetConfig()))
+		}
+		var message string
+		if ViperGetBool("verbose") {
+			message = "CTRL-C to shutdown"
+		}
+		err = daemon.Run(message)
+		cobra.CheckErr(err)
+	},
 }
 
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
-}
 func init() {
-	CobraInit(rootCmd)
+	CobraAddCommand(rootCmd, rootCmd, serverCmd)
+	OptionString(serverCmd, "bind-address", "a", "127.0.0.1", "bind address")
+	OptionString(serverCmd, "https-port", "p", "10080", "listen port")
+	OptionString(serverCmd, "ca", "", "", "certificate authority PEM file")
+	OptionString(serverCmd, "cert", "", "", "server certificate PEM file")
+	OptionString(serverCmd, "key", "", "", "server certificate key PEM file")
 }

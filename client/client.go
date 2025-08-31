@@ -2,8 +2,10 @@ package client
 
 import (
 	"github.com/rstms/winexec/message"
+	"github.com/spf13/viper"
 	"log"
 	"os"
+	"strings"
 )
 
 type Client struct {
@@ -11,9 +13,17 @@ type Client struct {
 	debug bool
 }
 
-func NewClient(prefix string) (*Client, error) {
+func viperPrefix() string {
+	prefix := "winexec.client."
+	if ProgramName() == "winexec" {
+		prefix = "client."
+	}
+	return prefix
+}
 
-	prefix += "winexec.client."
+func NewClient() (*Client, error) {
+
+	prefix := viperPrefix()
 	url := ViperGetString(prefix + "url")
 	cert := ViperGetString(prefix + "cert")
 	key := ViperGetString(prefix + "key")
@@ -41,6 +51,17 @@ func NewClient(prefix string) (*Client, error) {
 
 	return &client, nil
 
+}
+
+func (c *Client) GetConfig() map[string]any {
+	prefix := ViperKey(viperPrefix()) + "."
+	cfg := make(map[string]any)
+	for _, key := range viper.AllKeys() {
+		if strings.HasPrefix(key, prefix) {
+			cfg[key] = viper.Get(key)
+		}
+	}
+	return cfg
 }
 
 func (c *Client) Spawn(command string, exitCode *int) error {
