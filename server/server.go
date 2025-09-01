@@ -230,7 +230,7 @@ func runServer(d *Daemon) {
 	http.HandleFunc("POST /spawn/", handleSpawn)
 	http.HandleFunc("POST /download/", handleFileDownload)
 	http.HandleFunc("POST /upload/", handleFileUpload)
-	http.HandleFunc("POST /get/", handleFileGet)
+	http.HandleFunc("POST /dir/", handleDirectoryOps)
 
 	log.Printf("%s v%s server listening on %s in TLS mode\n", d.Name, d.Version, server.Addr)
 	go func() {

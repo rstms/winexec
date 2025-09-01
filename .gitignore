@@ -7,3 +7,4 @@ winexec.exe
 *.core
 notes
 client/testdata/certs
+client/testdata/files

@@ -37,8 +37,12 @@ func initClient(t *testing.T) *WinexecClient {
 
 func TestFileDownload(t *testing.T) {
 	c := initClient(t)
-	dst := filepath.Join("testdata", "hosts")
+	dst := filepath.Join("testdata", "howdy.txt")
 	err := c.Download(dst, "/c/users/mkrueger/howdy.txt")
+	require.Nil(t, err)
+
+	dst = filepath.Join("testdata", "hosts")
+	err = c.Download(dst, "/c/windows/system32/drivers/etc/hosts")
 	require.Nil(t, err)
 }
 

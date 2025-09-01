@@ -76,3 +76,20 @@ type FileUploadResponse struct {
 	Message  string
 	Pathname string
 }
+
+type DirectoryRequest struct {
+	Create   bool
+	Destroy  bool
+	List     bool
+	Detail   bool
+	Mode     fs.FileMode
+	Pathname string
+}
+
+type DirectoryResponse struct {
+	Success  bool
+	Message  string
+	Pathname string
+	Dirs     []string
+	Files    []string
+}
