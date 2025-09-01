@@ -1,0 +1,10 @@
+test:
+  logfile: stderr
+  debug: true
+  verbose: true
+  winexec:
+    client: 
+      url: https://${WINEXEC_HOST}:10080
+      ca: testdata/certs/ca.pem
+      cert: testdata/certs/cert.pem
+      key: testdata/certs/key.pem

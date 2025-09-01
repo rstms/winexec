@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 )
 
 func handleFileDownload(w http.ResponseWriter, r *http.Request) {
@@ -23,21 +22,15 @@ func handleFileDownload(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
 		log.Printf("%+v\n", request)
 	}
-
-	localized, err := filepath.Localize(request.Pathname)
-	if err != nil {
-		Warning("failed to localize path '%s': %v", request.Pathname, err)
-		fail(w, r, "path localization failed", http.StatusBadRequest)
-		return
-	}
-	fileinfo, err := os.Stat(localized)
+	srcPathname := request.Pathname
+	fileinfo, err := os.Stat(srcPathname)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "stat failed", http.StatusBadRequest)
 		return
 	}
 
-	data, err := os.ReadFile(localized)
+	data, err := os.ReadFile(srcPathname)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "read failed", http.StatusBadRequest)
@@ -46,7 +39,7 @@ func handleFileDownload(w http.ResponseWriter, r *http.Request) {
 	response := message.FileDownloadResponse{
 		Success:   true,
 		Message:   "download",
-		Pathname:  localized,
+		Pathname:  srcPathname,
 		Content:   data,
 		Timestamp: fileinfo.ModTime(),
 		Mode:      fileinfo.Mode(),

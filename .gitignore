@@ -6,3 +6,4 @@ winexec.exe
 .postactivate
 *.core
 notes
+client/testdata/certs

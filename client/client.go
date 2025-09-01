@@ -5,8 +5,11 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 )
+
+const Version = "1.1.7"
 
 type WinexecClient struct {
 	api   APIClient
@@ -133,7 +136,7 @@ func (c *WinexecClient) Upload(dst, src string) error {
 		return Fatal(err)
 	}
 	request := message.FileUploadRequest{
-		Pathname:  dst,
+		Pathname:  WindowsPath(dst),
 		Content:   data,
 		Timestamp: fileinfo.ModTime(),
 		Mode:      fileinfo.Mode(),
@@ -160,7 +163,7 @@ func (c *WinexecClient) Download(dst, src string) error {
 		log.Printf("winexec Download(%s %s)\n", dst, src)
 	}
 	request := message.FileDownloadRequest{
-		Pathname: src,
+		Pathname: WindowsPath(src),
 	}
 	var response message.FileDownloadResponse
 	if c.debug {
@@ -222,4 +225,31 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 		return Fatalf("WinExec: GetISO failed: %v", response)
 	}
 	return nil
+}
+
+// convert a local path to a windows path
+func WindowsPath(localPath string) string {
+	if strings.Contains(localPath, `\`) {
+		log.Println("has windows separators")
+		localPath = strings.ReplaceAll(localPath, `\`, "/")
+	}
+	var drivePrefix string
+	winPath := localPath
+	switch {
+	case regexp.MustCompile(`^/[a-zA-Z]/`).MatchString(winPath):
+		log.Println("has drive coded as dir")
+		drivePrefix = strings.ToUpper(string(winPath[1])) + ":"
+		winPath = winPath[2:]
+	case regexp.MustCompile(`^[a-zA-Z]:`).MatchString(winPath):
+		log.Println("has drive letter")
+		drivePrefix = strings.ToUpper(string(winPath[0])) + ":"
+		winPath = winPath[2:]
+	}
+	winPath = strings.ReplaceAll(winPath, "/", `\`)
+	ret := drivePrefix + winPath
+	log.Printf("localPath=%s\n", localPath)
+	log.Printf("drivePrefix=%s\n", drivePrefix)
+	log.Printf("winPath=%s\n", winPath)
+	log.Printf("ret=%s\n", ret)
+	return ret
 }

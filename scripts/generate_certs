@@ -21,3 +21,13 @@ for name in ca cert key; do
     printf >>$config '  %s: ~/.config/%s/%s.pem\n' "$name" "$program" "$name"
 done
 cat $config
+
+# generate client test certs
+mkdir -p client/testdata/certs
+mkcert --force --chain ca
+mv ca.pem client/testdata/certs
+mkcert test_client \
+    --force \
+    --duration 1d \
+    --cert-file client/testdata/certs/cert.pem \
+    --key-file client/testdata/certs/key.pem
