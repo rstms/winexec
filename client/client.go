@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const Version = "1.1.9"
+const Version = "1.1.10"
 
 type WinexecClient struct {
 	api   APIClient
