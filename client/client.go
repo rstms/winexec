@@ -3,6 +3,7 @@ package client
 import (
 	"github.com/rstms/winexec/message"
 	"github.com/spf13/viper"
+	"io/fs"
 	"log"
 	"os"
 	"regexp"
@@ -165,10 +166,10 @@ func (c *WinexecClient) Download(dst, src string) error {
 	request := message.FileDownloadRequest{
 		Pathname: WindowsPath(src),
 	}
-	var response message.FileDownloadResponse
 	if c.debug {
 		log.Printf("winexec download request: %+v\n", request)
 	}
+	var response message.FileDownloadResponse
 	_, err := c.api.Post("/download/", &request, &response, nil)
 	if err != nil {
 		return Fatal(err)
@@ -190,7 +191,6 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 	if c.debug {
 		log.Printf("winexec GetISO(%s %s %s %s %s)\n", dst, url, ca, cert, key)
 	}
-	var response message.ExecResponse
 	caData, err := os.ReadFile(ca)
 	if err != nil {
 		return Fatal(err)
@@ -214,6 +214,7 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 	if c.debug {
 		log.Printf("winexec get request: %+v\n", request)
 	}
+	var response message.FileGetResponse
 	_, err = c.api.Post("/get/", &request, &response, nil)
 	if err != nil {
 		return Fatal(err)
@@ -252,4 +253,99 @@ func WindowsPath(localPath string) string {
 	log.Printf("winPath=%s\n", winPath)
 	log.Printf("ret=%s\n", ret)
 	return ret
+}
+
+func (c *WinexecClient) DirFiles(pathname string) ([]string, error) {
+	if c.debug {
+		log.Printf("winexec DirFiles(%s)\n", pathname)
+	}
+	entries, err := c.DirEntries(pathname)
+	if err != nil {
+		return []string{}, Fatal(err)
+	}
+	files := []string{}
+	for name, _ := range entries {
+		files = append(files, name)
+	}
+	return files, nil
+}
+
+func (c *WinexecClient) DirEntries(pathname string) (map[string]message.DirectoryEntry, error) {
+	if c.debug {
+		log.Printf("winexec DirEntries(%s)\n", pathname)
+	}
+	request := message.DirectoryRequest{
+		Pathname: WindowsPath(pathname),
+		List:     true,
+	}
+	if c.debug {
+		log.Printf("winexec directory request: %+v\n", request)
+	}
+	entries := make(map[string]message.DirectoryEntry)
+	var response message.DirectoryResponse
+	_, err := c.api.Post("/dir/", &request, &response, nil)
+	if err != nil {
+		return entries, Fatal(err)
+	}
+	if c.debug {
+		log.Printf("winexec directory response: %+v\n", response)
+	}
+	if !response.Success {
+		return entries, Fatalf("WinExec: directory operation failed: %v", response)
+	}
+	for name, entry := range response.Entries {
+		entries[name] = entry
+	}
+	return entries, nil
+}
+
+func (c *WinexecClient) MkdirAll(pathname string, mode fs.FileMode) error {
+	if c.debug {
+		log.Printf("winexec MkdirAll(%s, %v)\n", pathname, mode)
+	}
+	request := message.DirectoryRequest{
+		Pathname: WindowsPath(pathname),
+		Mode:     mode,
+		Create:   true,
+	}
+	if c.debug {
+		log.Printf("winexec directory request: %+v\n", request)
+	}
+	var response message.DirectoryResponse
+	_, err := c.api.Post("/dir/", &request, &response, nil)
+	if err != nil {
+		return Fatal(err)
+	}
+	if c.debug {
+		log.Printf("winexec directory response: %+v\n", response)
+	}
+	if !response.Success {
+		return Fatalf("WinExec: directory operation failed: %v", response)
+	}
+	return nil
+}
+
+func (c *WinexecClient) RemoveAll(pathname string) error {
+	if c.debug {
+		log.Printf("winexec RemoveAll(%s)\n", pathname)
+	}
+	request := message.DirectoryRequest{
+		Pathname: WindowsPath(pathname),
+		Destroy:  true,
+	}
+	if c.debug {
+		log.Printf("winexec directory request: %+v\n", request)
+	}
+	var response message.DirectoryResponse
+	_, err := c.api.Post("/dir/", &request, &response, nil)
+	if err != nil {
+		return Fatal(err)
+	}
+	if c.debug {
+		log.Printf("winexec directory response: %+v\n", response)
+	}
+	if !response.Success {
+		return Fatalf("WinExec: directory destroy failed: %v", response)
+	}
+	return nil
 }

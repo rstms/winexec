@@ -81,15 +81,20 @@ type DirectoryRequest struct {
 	Create   bool
 	Destroy  bool
 	List     bool
-	Detail   bool
 	Mode     fs.FileMode
 	Pathname string
+}
+
+type DirectoryEntry struct {
+	Name    string
+	Size    int64
+	ModTime time.Time
+	Mode    fs.FileMode
 }
 
 type DirectoryResponse struct {
 	Success  bool
 	Message  string
 	Pathname string
-	Dirs     []string
-	Files    []string
+	Entries  map[string]DirectoryEntry
 }

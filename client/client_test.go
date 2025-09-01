@@ -60,3 +60,28 @@ func TestWindowsPath(t *testing.T) {
 	w = WindowsPath(`s:foo\moo\goo.ext`)
 	require.Equal(t, `S:foo\moo\goo.ext`, w)
 }
+
+func TestDirFiles(t *testing.T) {
+	c := initClient(t)
+	files, err := c.DirFiles(`\users\mkrueger`)
+	require.Nil(t, err)
+	require.IsType(t, []string{}, files)
+	require.NotEmpty(t, files)
+	for _, file := range files {
+		require.NotEmpty(t, file)
+		log.Println(file)
+	}
+}
+
+func TestDirDetail(t *testing.T) {
+	c := initClient(t)
+	entries, err := c.DirDetail(`c:\tmp`)
+	require.Nil(t, err)
+	require.IsType(t, []Entry{}, *entries)
+	require.NotEmpty(t, *entries)
+	var e Entry
+	for _, entry := range *entries {
+		require.IsType(t, e, entry)
+		log.Printf("%+v\n", entry)
+	}
+}

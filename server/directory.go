@@ -83,7 +83,7 @@ func handleDirectoryOps(w http.ResponseWriter, r *http.Request) {
 		if failIfNotDir(request.Pathname, w, r) {
 			return
 		}
-		err := listDirectory(request.Pathname, request.Detail, &response)
+		err := listDirectory(request.Pathname, &response)
 		if err != nil {
 			Warning("listDirectory failed: %v", err)
 			fail(w, r, "list failed", http.StatusInternalServerError)
@@ -119,33 +119,22 @@ func handleDirectoryOps(w http.ResponseWriter, r *http.Request) {
 	succeed(w, r, &response)
 }
 
-func listDirectory(pathname string, detail bool, response *message.DirectoryResponse) error {
+func listDirectory(pathname string, response *message.DirectoryResponse) error {
 	entries, err := os.ReadDir(pathname)
 	if err != nil {
 		return Fatal(err)
 	}
+	response.Entries = make(map[string]message.DirectoryEntry)
 	for _, entry := range entries {
-		switch {
-		case entry.IsDir():
-			line := entry.Name()
-			if detail {
-				info, err := entry.Info()
-				if err != nil {
-					return Fatal(err)
-				}
-				line = FormatJSON(info)
-			}
-			response.Dirs = append(response.Dirs, line)
-		case entry.Type().IsRegular():
-			line := entry.Name()
-			if detail {
-				info, err := entry.Info()
-				if err != nil {
-					return Fatal(err)
-				}
-				line = FormatJSON(info)
-			}
-			response.Files = append(response.Files, line)
+		info, err := entry.Info()
+		if err != nil {
+			return Fatal(err)
+		}
+		response.Entries[entry.Name()] = message.DirectoryEntry{
+			Name:    entry.Name(),
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+			Mode:    entry.Type(),
 		}
 	}
 	return nil
