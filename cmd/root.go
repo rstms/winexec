@@ -58,4 +58,5 @@ func Execute() {
 }
 func init() {
 	CobraInit(rootCmd)
+	OptionSwitch(rootCmd, "quiet", "q", "suppress output")
 }
