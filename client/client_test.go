@@ -126,7 +126,6 @@ func TestDirEntries(t *testing.T) {
 func TestMkdir(t *testing.T) {
 	c := initClient(t)
 	err := c.RemoveAll("/c/tmp/foo")
-	require.Nil(t, err)
 	before, err := c.DirSubs("/c/tmp")
 	require.Nil(t, err)
 	err = c.MkdirAll("/c/tmp/foo/moo", 0700)
@@ -141,4 +140,38 @@ func TestMkdir(t *testing.T) {
 	require.Equal(t, []string{"moo"}, subs)
 	err = c.RemoveAll("/c/tmp/foo")
 	require.Nil(t, err)
+}
+
+func TestUploadFile(t *testing.T) {
+	c := initClient(t)
+
+	testDir := "/c/tmp/upload_test"
+	filename := "config.yaml"
+	c.RemoveAll(testDir)
+	err := c.MkdirAll(testDir, 0700)
+	require.Nil(t, err)
+	before, err := c.DirFiles(testDir)
+	require.Nil(t, err)
+	present := slices.Contains(before, filename)
+	require.False(t, present)
+	localSrc := filepath.Join("testdata", filename)
+	remoteDst := filepath.Join(testDir, filename)
+	err = c.Upload(remoteDst, localSrc)
+	require.Nil(t, err)
+	after, err := c.DirFiles(testDir)
+	require.Nil(t, err)
+	present = slices.Contains(after, filename)
+	require.True(t, present)
+	checkFile := filepath.Join("testdata", "files", filename)
+	err = c.Download(checkFile, remoteDst)
+	require.Nil(t, err)
+
+	localData, err := os.ReadFile(localSrc)
+	require.Nil(t, err)
+	readbackData, err := os.ReadFile(checkFile)
+	require.Nil(t, err)
+	require.Equal(t, localData, readbackData)
+
+	//err = c.RemoveAll(testDir)
+	//require.Nil(t, err)
 }

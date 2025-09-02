@@ -69,6 +69,7 @@ type FileUploadRequest struct {
 	Content   []byte
 	Timestamp time.Time
 	Mode      fs.FileMode
+	Force     bool
 }
 
 type FileUploadResponse struct {

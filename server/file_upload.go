@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -25,19 +24,21 @@ func handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%+v\n", request)
 	}
 
-	localized, err := filepath.Localize(request.Pathname)
-	if err != nil {
-		Warning("failed to localize path '%s': %v", request.Pathname, err)
-		fail(w, r, "path localization failed", http.StatusBadRequest)
-		return
+	if IsFile(request.Pathname) {
+		if !request.Force {
+			Warning("file exists: '%s'", request.Pathname)
+			fail(w, r, "file exists", http.StatusBadRequest)
+			return
+		}
 	}
-	err = os.WriteFile(localized, request.Content, request.Mode)
+
+	err = os.WriteFile(request.Pathname, request.Content, request.Mode)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "write failed", http.StatusBadRequest)
 		return
 	}
-	err = os.Chtimes(localized, time.Time{}, request.Timestamp)
+	err = os.Chtimes(request.Pathname, time.Time{}, request.Timestamp)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "time update failed", http.StatusBadRequest)
@@ -47,7 +48,7 @@ func handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	response := message.FileDownloadResponse{
 		Success:  true,
 		Message:  "uploaded",
-		Pathname: localized,
+		Pathname: request.Pathname,
 	}
 	succeed(w, r, &response)
 }

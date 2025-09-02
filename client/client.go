@@ -123,7 +123,7 @@ func (c *WinexecClient) Exec(command string, args []string, exitCode *int) (stri
 	return response.Stdout, response.Stderr, nil
 }
 
-func (c *WinexecClient) Upload(dst, src string) error {
+func (c *WinexecClient) Upload(dst, src string, force bool) error {
 	if c.debug {
 		log.Printf("winexec Upload(%s %s)\n", dst, src)
 	}
@@ -142,6 +142,7 @@ func (c *WinexecClient) Upload(dst, src string) error {
 		Content:   data,
 		Timestamp: fileinfo.ModTime(),
 		Mode:      fileinfo.Mode(),
+		Force:     force,
 	}
 	var response message.FileDownloadResponse
 	if c.debug {
