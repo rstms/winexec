@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 )
 
 func handleFileGet(w http.ResponseWriter, r *http.Request) {
@@ -27,13 +26,7 @@ func handleFileGet(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%+v\n", request)
 	}
 
-	localized, err := filepath.Localize(request.Pathname)
-	if err != nil {
-		Warning("failed to localize path '%s': %v", request.Pathname, err)
-		fail(w, r, "path localization failed", http.StatusBadRequest)
-		return
-	}
-	count, err := getFile(localized, request.URL, request.CA, request.Cert, request.Key)
+	count, err := getFile(request.Pathname, request.URL, request.CA, request.Cert, request.Key)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "get request failed", http.StatusBadRequest)
@@ -42,7 +35,7 @@ func handleFileGet(w http.ResponseWriter, r *http.Request) {
 	response := message.FileGetResponse{
 		Success:  true,
 		Message:  "downloaded",
-		Pathname: localized,
+		Pathname: request.Pathname,
 		Bytes:    count,
 	}
 	succeed(w, r, &response)
