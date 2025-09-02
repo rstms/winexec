@@ -156,7 +156,7 @@ func TestUploadFile(t *testing.T) {
 	require.False(t, present)
 	localSrc := filepath.Join("testdata", filename)
 	remoteDst := filepath.Join(testDir, filename)
-	err = c.Upload(remoteDst, localSrc)
+	err = c.Upload(remoteDst, localSrc, false)
 	require.Nil(t, err)
 	after, err := c.DirFiles(testDir)
 	require.Nil(t, err)
@@ -172,6 +172,6 @@ func TestUploadFile(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, localData, readbackData)
 
-	//err = c.RemoveAll(testDir)
-	//require.Nil(t, err)
+	err = c.RemoveAll(testDir)
+	require.Nil(t, err)
 }
