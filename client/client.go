@@ -138,7 +138,7 @@ func (c *WinexecClient) Upload(dst, src string, force bool) error {
 		return Fatal(err)
 	}
 	request := message.FileUploadRequest{
-		Pathname:  WindowsPath(dst),
+		Pathname:  c.WindowsPath(dst),
 		Content:   data,
 		Timestamp: fileinfo.ModTime(),
 		Mode:      fileinfo.Mode(),
@@ -166,7 +166,7 @@ func (c *WinexecClient) Download(dst, src string) error {
 		log.Printf("winexec Download(%s %s)\n", dst, src)
 	}
 	request := message.FileDownloadRequest{
-		Pathname: WindowsPath(src),
+		Pathname: c.WindowsPath(src),
 	}
 	if c.debug {
 		log.Printf("winexec download request: %+v\n", request)
@@ -231,7 +231,7 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 }
 
 // convert a local path to a windows path
-func WindowsPath(localPath string) string {
+func (c *WinexecClient) WindowsPath(localPath string) string {
 	if strings.Contains(localPath, `\`) {
 		log.Println("has windows separators")
 		localPath = strings.ReplaceAll(localPath, `\`, "/")
@@ -240,15 +240,15 @@ func WindowsPath(localPath string) string {
 	winPath := localPath
 	switch {
 	case regexp.MustCompile(`^/[a-zA-Z]/`).MatchString(winPath):
-		log.Println("has drive letter coded as dir")
+		//log.Println("has drive letter coded as dir")
 		drivePrefix = strings.ToUpper(string(winPath[1])) + ":"
 		winPath = winPath[2:]
 	case regexp.MustCompile(`^[a-zA-Z]:`).MatchString(winPath):
-		log.Println("has drive letter colon prefix")
+		//log.Println("has drive letter colon prefix")
 		drivePrefix = strings.ToUpper(string(winPath[0])) + ":"
 		winPath = winPath[2:]
 	case regexp.MustCompile(`^//[^/]+/[^/]+/[^/]+`).MatchString(winPath):
-		log.Printf("has UNC drive prefix: %s\n", winPath)
+		//log.Printf("has UNC drive prefix: %s\n", winPath)
 		elements := regexp.MustCompile(`^//([^/]+)/([a-zA-Z][$:]{0,1})(/.*)$`).FindStringSubmatch(winPath)
 		if len(elements) == 4 {
 			for i, element := range elements {
@@ -260,10 +260,10 @@ func WindowsPath(localPath string) string {
 	}
 	winPath = strings.ReplaceAll(winPath, "/", `\`)
 	ret := drivePrefix + winPath
-	log.Printf("localPath=%s\n", localPath)
-	log.Printf("drivePrefix=%s\n", drivePrefix)
-	log.Printf("winPath=%s\n", winPath)
-	log.Printf("ret=%s\n", ret)
+	//log.Printf("localPath=%s\n", localPath)
+	//log.Printf("drivePrefix=%s\n", drivePrefix)
+	//log.Printf("winPath=%s\n", winPath)
+	//log.Printf("ret=%s\n", ret)
 	return ret
 }
 
@@ -308,7 +308,7 @@ func (c *WinexecClient) DirEntries(pathname string) (map[string]message.Director
 		log.Printf("winexec DirEntries(%s)\n", pathname)
 	}
 	request := message.DirectoryRequest{
-		Pathname: WindowsPath(pathname),
+		Pathname: c.WindowsPath(pathname),
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
@@ -336,7 +336,7 @@ func (c *WinexecClient) MkdirAll(pathname string, mode fs.FileMode) error {
 		log.Printf("winexec MkdirAll(%s, %v)\n", pathname, mode)
 	}
 	request := message.DirectoryCreateRequest{
-		Pathname: WindowsPath(pathname),
+		Pathname: c.WindowsPath(pathname),
 		Mode:     mode,
 	}
 	if c.debug {
@@ -361,7 +361,7 @@ func (c *WinexecClient) RemoveAll(pathname string) error {
 		log.Printf("winexec RemoveAll(%s)\n", pathname)
 	}
 	request := message.DirectoryDestroyRequest{
-		Pathname: WindowsPath(pathname),
+		Pathname: c.WindowsPath(pathname),
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
