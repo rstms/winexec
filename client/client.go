@@ -206,7 +206,7 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 		return Fatal(err)
 	}
 	request := message.FileGetRequest{
-		Pathname: dst,
+		Pathname: c.WindowsPath(dst),
 		URL:      url,
 		CA:       caData,
 		Cert:     certData,
