@@ -2,12 +2,16 @@ package client
 
 import (
 	"bytes"
+	"github.com/rstms/winexec/message"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
+	"time"
 )
 
 func dumpConfig(t *testing.T) {
@@ -37,11 +41,13 @@ func initClient(t *testing.T) *WinexecClient {
 
 func TestFileDownload(t *testing.T) {
 	c := initClient(t)
-	dst := filepath.Join("testdata", "howdy.txt")
-	err := c.Download(dst, "/c/users/mkrueger/howdy.txt")
+	testUserFile := ViperGetString("user_file")
+	_, filename := filepath.Split(testUserFile)
+	dst := filepath.Join("testdata", "files", filename)
+	err := c.Download(dst, testUserFile)
 	require.Nil(t, err)
 
-	dst = filepath.Join("testdata", "hosts")
+	dst = filepath.Join("testdata", "files", "hosts")
 	err = c.Download(dst, "/c/windows/system32/drivers/etc/hosts")
 	require.Nil(t, err)
 }
@@ -59,11 +65,20 @@ func TestWindowsPath(t *testing.T) {
 	require.Equal(t, `A:config.sys`, w)
 	w = WindowsPath(`s:foo\moo\goo.ext`)
 	require.Equal(t, `S:foo\moo\goo.ext`, w)
+	w = WindowsPath(`\\localhost\c$\tmp\foo`)
+	require.Equal(t, `C:\tmp\foo`, w)
+	w = WindowsPath("//./D/fleem/")
+	require.Equal(t, `D:\fleem\`, w)
+	w = WindowsPath("//./D$/fleem/")
+	require.Equal(t, `D:\fleem\`, w)
+	w = WindowsPath("//./D:/fleem/")
+	require.Equal(t, `D:\fleem\`, w)
 }
 
 func TestDirFiles(t *testing.T) {
 	c := initClient(t)
-	files, err := c.DirFiles(`\users\mkrueger`)
+	testFilesDir := ViperGetString("files_dir")
+	files, err := c.DirFiles(testFilesDir)
 	require.Nil(t, err)
 	require.IsType(t, []string{}, files)
 	require.NotEmpty(t, files)
@@ -73,15 +88,57 @@ func TestDirFiles(t *testing.T) {
 	}
 }
 
-func TestDirDetail(t *testing.T) {
+func TestDirSubs(t *testing.T) {
 	c := initClient(t)
-	entries, err := c.DirDetail(`c:\tmp`)
+	testSubsDir := ViperGetString("subs_dir")
+	subs, err := c.DirSubs(testSubsDir)
 	require.Nil(t, err)
-	require.IsType(t, []Entry{}, *entries)
-	require.NotEmpty(t, *entries)
-	var e Entry
-	for _, entry := range *entries {
-		require.IsType(t, e, entry)
-		log.Printf("%+v\n", entry)
+	require.IsType(t, []string{}, subs)
+	require.NotEmpty(t, subs)
+	for _, sub := range subs {
+		require.NotEmpty(t, sub)
+		log.Println(sub)
 	}
+}
+
+func TestDirEntries(t *testing.T) {
+	c := initClient(t)
+	entries, err := c.DirEntries(`c:\tmp`)
+	require.Nil(t, err)
+	require.IsType(t, map[string]message.DirectoryEntry{}, entries)
+	require.NotEmpty(t, entries)
+	for name, entry := range entries {
+		require.IsType(t, message.DirectoryEntry{}, entry)
+		require.IsType(t, "", entry.Name)
+		require.IsType(t, int64(0), entry.Size)
+		require.IsType(t, fs.FileMode(0), entry.Mode)
+		require.IsType(t, time.Time{}, entry.ModTime)
+		log.Printf("\n%s: %+v\n", name, entry)
+		log.Printf("\tName: %s\n", entry.Name)
+		log.Printf("\tSize: %d\n", entry.Size)
+		log.Printf("\tModTime: %s\n", entry.ModTime.Format(time.DateTime))
+		log.Printf("\tIsDir: %v\n", entry.Mode.IsDir())
+		log.Printf("\tIsRegular: %v\n", entry.Mode.IsRegular())
+
+	}
+}
+
+func TestMkdir(t *testing.T) {
+	c := initClient(t)
+	err := c.RemoveAll("/c/tmp/foo")
+	require.Nil(t, err)
+	before, err := c.DirSubs("/c/tmp")
+	require.Nil(t, err)
+	err = c.MkdirAll("/c/tmp/foo/moo", 0700)
+	require.Nil(t, err)
+	after, err := c.DirSubs("/c/tmp")
+	require.Nil(t, err)
+	expected := append(before, "foo")
+	slices.Sort(expected)
+	require.Equal(t, expected, after)
+	subs, err := c.DirSubs("/c/tmp/foo")
+	require.Nil(t, err)
+	require.Equal(t, []string{"moo"}, subs)
+	err = c.RemoveAll("/c/tmp/foo")
+	require.Nil(t, err)
 }

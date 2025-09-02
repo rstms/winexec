@@ -78,10 +78,15 @@ type FileUploadResponse struct {
 }
 
 type DirectoryRequest struct {
-	Create   bool
-	Destroy  bool
-	List     bool
+	Pathname string
+}
+
+type DirectoryCreateRequest struct {
+	Pathname string
 	Mode     fs.FileMode
+}
+
+type DirectoryDestroyRequest struct {
 	Pathname string
 }
 

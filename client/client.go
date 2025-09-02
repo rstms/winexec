@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -238,13 +239,23 @@ func WindowsPath(localPath string) string {
 	winPath := localPath
 	switch {
 	case regexp.MustCompile(`^/[a-zA-Z]/`).MatchString(winPath):
-		log.Println("has drive coded as dir")
+		log.Println("has drive letter coded as dir")
 		drivePrefix = strings.ToUpper(string(winPath[1])) + ":"
 		winPath = winPath[2:]
 	case regexp.MustCompile(`^[a-zA-Z]:`).MatchString(winPath):
-		log.Println("has drive letter")
+		log.Println("has drive letter colon prefix")
 		drivePrefix = strings.ToUpper(string(winPath[0])) + ":"
 		winPath = winPath[2:]
+	case regexp.MustCompile(`^//[^/]+/[^/]+/[^/]+`).MatchString(winPath):
+		log.Printf("has UNC drive prefix: %s\n", winPath)
+		elements := regexp.MustCompile(`^//([^/]+)/([a-zA-Z][$:]{0,1})(/.*)$`).FindStringSubmatch(winPath)
+		if len(elements) == 4 {
+			for i, element := range elements {
+				log.Printf("%d: %s\n", i, element)
+			}
+			drivePrefix = strings.ToUpper(string(elements[2][0])) + ":"
+			winPath = elements[3]
+		}
 	}
 	winPath = strings.ReplaceAll(winPath, "/", `\`)
 	ret := drivePrefix + winPath
@@ -264,10 +275,31 @@ func (c *WinexecClient) DirFiles(pathname string) ([]string, error) {
 		return []string{}, Fatal(err)
 	}
 	files := []string{}
-	for name, _ := range entries {
-		files = append(files, name)
+	for name, entry := range entries {
+		if entry.Mode.IsRegular() {
+			files = append(files, name)
+		}
 	}
+	slices.Sort(files)
 	return files, nil
+}
+
+func (c *WinexecClient) DirSubs(pathname string) ([]string, error) {
+	if c.debug {
+		log.Printf("winexec DirSubdirs(%s)\n", pathname)
+	}
+	entries, err := c.DirEntries(pathname)
+	if err != nil {
+		return []string{}, Fatal(err)
+	}
+	subs := []string{}
+	for name, entry := range entries {
+		if entry.Mode.IsDir() {
+			subs = append(subs, name)
+		}
+	}
+	slices.Sort(subs)
+	return subs, nil
 }
 
 func (c *WinexecClient) DirEntries(pathname string) (map[string]message.DirectoryEntry, error) {
@@ -276,7 +308,6 @@ func (c *WinexecClient) DirEntries(pathname string) (map[string]message.Director
 	}
 	request := message.DirectoryRequest{
 		Pathname: WindowsPath(pathname),
-		List:     true,
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
@@ -303,16 +334,15 @@ func (c *WinexecClient) MkdirAll(pathname string, mode fs.FileMode) error {
 	if c.debug {
 		log.Printf("winexec MkdirAll(%s, %v)\n", pathname, mode)
 	}
-	request := message.DirectoryRequest{
+	request := message.DirectoryCreateRequest{
 		Pathname: WindowsPath(pathname),
 		Mode:     mode,
-		Create:   true,
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
 	}
 	var response message.DirectoryResponse
-	_, err := c.api.Post("/dir/", &request, &response, nil)
+	_, err := c.api.Post("/mkdir/", &request, &response, nil)
 	if err != nil {
 		return Fatal(err)
 	}
@@ -329,15 +359,14 @@ func (c *WinexecClient) RemoveAll(pathname string) error {
 	if c.debug {
 		log.Printf("winexec RemoveAll(%s)\n", pathname)
 	}
-	request := message.DirectoryRequest{
+	request := message.DirectoryDestroyRequest{
 		Pathname: WindowsPath(pathname),
-		Destroy:  true,
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
 	}
 	var response message.DirectoryResponse
-	_, err := c.api.Post("/dir/", &request, &response, nil)
+	_, err := c.api.Post("/rmdir/", &request, &response, nil)
 	if err != nil {
 		return Fatal(err)
 	}
