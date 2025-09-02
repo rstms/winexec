@@ -233,6 +233,7 @@ func runServer(d *Daemon) {
 	http.HandleFunc("POST /dir/", handleDirectoryEntries)
 	http.HandleFunc("POST /mkdir/", handleDirectoryCreate)
 	http.HandleFunc("POST /rmdir/", handleDirectoryDestroy)
+	http.HandleFunc("POST /get/", handleFileGet)
 
 	log.Printf("%s v%s server listening on %s in TLS mode\n", d.Name, d.Version, server.Addr)
 	go func() {
