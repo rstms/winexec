@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const Version = "1.1.24"
+const Version = "1.1.25"
 
 const DEFAULT_AUTO_DELETE_SECONDS = 300
 
