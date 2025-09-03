@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-func handleFileGet(w http.ResponseWriter, r *http.Request) {
+func (s *WinexecServer) handleFileGet(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
 		log.Printf("%s -> %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
 	}
@@ -32,6 +32,9 @@ func handleFileGet(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, "get request failed", http.StatusBadRequest)
 		return
 	}
+
+	s.setAutoDelete(request.Pathname, request.AutoDeleteSeconds)
+
 	response := message.FileGetResponse{
 		Success:  true,
 		Message:  "downloaded",

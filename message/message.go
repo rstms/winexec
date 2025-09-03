@@ -37,11 +37,12 @@ type SpawnResponse struct {
 }
 
 type FileGetRequest struct {
-	Pathname string
-	URL      string
-	CA       []byte
-	Cert     []byte
-	Key      []byte
+	Pathname          string
+	URL               string
+	CA                []byte
+	Cert              []byte
+	Key               []byte
+	AutoDeleteSeconds int
 }
 
 type FileGetResponse struct {

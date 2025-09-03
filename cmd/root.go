@@ -36,7 +36,7 @@ import (
 	"os"
 )
 
-var Server *server.Daemon
+var Server *server.WinexecServer
 
 var rootCmd = &cobra.Command{
 	Use:     "winexec",

@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -23,11 +24,12 @@ const Version = "1.1.19"
 const DEFAULT_BIND_ADDRESS = "127.0.0.1"
 const DEFAULT_HTTPS_PORT = 10080
 const DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 5
+const DEFAULT_AUTODELETE_INTERVAL_SECONDS = 5
 
 var Verbose bool
 var Debug bool
 
-type Daemon struct {
+type WinexecServer struct {
 	Name                   string
 	Address                string
 	Version                string
@@ -42,6 +44,11 @@ type Daemon struct {
 	shutdownTimeoutSeconds int
 	debug                  bool
 	verbose                bool
+
+	autoDeleteFiles           map[string]time.Time
+	autoDeleteWaiter          sync.WaitGroup
+	autoDeleteIntervalSeconds int
+	autoDeleteStopRequest     chan struct{}
 }
 
 func viperPrefix() string {
@@ -52,7 +59,7 @@ func viperPrefix() string {
 	return prefix
 }
 
-func NewWinexecServer() (*Daemon, error) {
+func NewWinexecServer() (*WinexecServer, error) {
 	prefix := viperPrefix()
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
@@ -65,31 +72,35 @@ func NewWinexecServer() (*Daemon, error) {
 	ViperSetDefault(prefix+"cert", filepath.Join(configDir, "cert.pem"))
 	ViperSetDefault(prefix+"key", filepath.Join(configDir, "key.pem"))
 	ViperSetDefault(prefix+"shutdown_timeout_seconds", DEFAULT_SHUTDOWN_TIMEOUT_SECONDS)
+	ViperSetDefault(prefix+"autodelete_interval_seconds", DEFAULT_AUTODELETE_INTERVAL_SECONDS)
 
-	d := Daemon{
-		Name:                   "winexec",
-		Address:                ViperGetString(prefix + "bind_address"),
-		Port:                   ViperGetInt(prefix + "https_port"),
-		Version:                Version,
-		started:                make(chan struct{}),
-		shutdownRequest:        make(chan struct{}),
-		shutdownComplete:       make(chan struct{}),
-		debug:                  ViperGetBool("debug"),
-		verbose:                ViperGetBool("verbose"),
-		ca:                     ViperGetString(prefix + "ca"),
-		cert:                   ViperGetString(prefix + "cert"),
-		key:                    ViperGetString(prefix + "key"),
-		shutdownTimeoutSeconds: ViperGetInt(prefix + "shutdown_timeout_seconds"),
+	s := WinexecServer{
+		Name:                      "winexec",
+		Address:                   ViperGetString(prefix + "bind_address"),
+		Port:                      ViperGetInt(prefix + "https_port"),
+		Version:                   Version,
+		started:                   make(chan struct{}),
+		shutdownRequest:           make(chan struct{}),
+		shutdownComplete:          make(chan struct{}),
+		debug:                     ViperGetBool(prefix + "debug"),
+		verbose:                   ViperGetBool(prefix + "verbose"),
+		ca:                        ViperGetString(prefix + "ca"),
+		cert:                      ViperGetString(prefix + "cert"),
+		key:                       ViperGetString(prefix + "key"),
+		shutdownTimeoutSeconds:    ViperGetInt(prefix + "shutdown_timeout_seconds"),
+		autoDeleteIntervalSeconds: ViperGetInt(prefix + "autodelete_interval_seconds"),
+		autoDeleteFiles:           make(map[string]time.Time),
+		autoDeleteStopRequest:     make(chan struct{}),
 	}
-	Verbose = d.verbose
-	Debug = d.debug
+	Verbose = s.verbose
+	Debug = s.debug
 	if Debug {
-		log.Printf("winexec server config: %s\n", FormatJSON(d.GetConfig()))
+		log.Printf("winexec server config: %s\n", FormatJSON(s.GetConfig()))
 	}
-	return &d, nil
+	return &s, nil
 }
 
-func (d *Daemon) GetConfig() map[string]any {
+func (s *WinexecServer) GetConfig() map[string]any {
 	prefix := ViperKey(viperPrefix())
 	cfg := make(map[string]any)
 	for _, key := range viper.AllKeys() {
@@ -100,32 +111,32 @@ func (d *Daemon) GetConfig() map[string]any {
 	return cfg
 }
 
-func (d *Daemon) Start() error {
+func (s *WinexecServer) Start() error {
 	log.Println("callingRunServer")
-	go runServer(d)
+	go runServer(s)
 	log.Println("awaiting 'started' message...")
-	<-d.started
+	<-s.started
 	log.Println("received 'started' message")
-	title := fmt.Sprintf("%s v%s", d.Name, d.Version)
-	menu, err := NewMenu(title, d.shutdownRequest, d.shutdownComplete)
+	title := fmt.Sprintf("%s v%s", s.Name, s.Version)
+	menu, err := NewMenu(title, s.shutdownRequest, s.shutdownComplete)
 	if err != nil {
 		return err
 	}
-	d.menu = menu
+	s.menu = menu
 	return nil
 }
 
-func (d *Daemon) Stop() error {
+func (s *WinexecServer) Stop() error {
 	log.Println("Stop: sending 'shutdownRequest' message")
-	d.shutdownRequest <- struct{}{}
+	s.shutdownRequest <- struct{}{}
 	log.Println("Stop: awaiting 'shutdownComplete' message...")
-	<-d.shutdownComplete
+	<-s.shutdownComplete
 	log.Println("Stop: received 'shutdownComplete' message")
 	return nil
 }
 
-func (d *Daemon) Run(message string) error {
-	err := d.Start()
+func (s *WinexecServer) Run(message string) error {
+	err := s.Start()
 	if err != nil {
 		return err
 	}
@@ -137,11 +148,11 @@ func (d *Daemon) Run(message string) error {
 	select {
 	case <-sigint:
 		log.Println("Run: received SIGINT")
-		err = d.Stop()
+		err = s.Stop()
 		if err != nil {
 			return err
 		}
-	case <-d.shutdownComplete:
+	case <-s.shutdownComplete:
 		log.Println("Run: received shutdownComplete")
 	}
 	return nil
@@ -152,7 +163,7 @@ func fail(w http.ResponseWriter, r *http.Request, failMessage string, status int
 		Success: false,
 		Message: failMessage,
 	}
-	if Verbose {
+	if Debug {
 		log.Printf("%s <- [%d] %s\n", r.RemoteAddr, status, failMessage)
 	}
 	w.WriteHeader(status)
@@ -163,7 +174,7 @@ func fail(w http.ResponseWriter, r *http.Request, failMessage string, status int
 }
 
 func succeed(w http.ResponseWriter, r *http.Request, response interface{}) {
-	if Verbose {
+	if Debug {
 		log.Printf("%s <- [200] %+v\n", r.RemoteAddr, response)
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -173,26 +184,14 @@ func succeed(w http.ResponseWriter, r *http.Request, response interface{}) {
 	}
 }
 
-func readPEM(filename string) ([]byte, error) {
-	filename = filepath.Clean(filename)
-	if strings.HasPrefix(filename, "~") {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return []byte{}, err
-		}
-		filename = filepath.Join(homeDir, filename[1:])
-	}
-	return os.ReadFile(filename)
-}
+func runServer(s *WinexecServer) {
 
-func runServer(d *Daemon) {
-
-	serverCertPEM, err := readPEM(d.cert)
+	serverCertPEM, err := os.ReadFile(s.cert)
 	if err != nil {
 		log.Fatalf("Failed reading server certificate: %v", err)
 	}
 
-	serverKeyPEM, err := readPEM(d.key)
+	serverKeyPEM, err := os.ReadFile(s.key)
 	if err != nil {
 		log.Fatalf("Failed reading server certificate key: %v", err)
 	}
@@ -202,7 +201,7 @@ func runServer(d *Daemon) {
 		log.Fatalf("Failed creating X509 keypair: %v", err)
 	}
 
-	caCertPEM, err := readPEM(d.ca)
+	caCertPEM, err := os.ReadFile(s.ca)
 	if err != nil {
 		log.Fatalf("Failed reading CA file: %v", err)
 	}
@@ -219,7 +218,7 @@ func runServer(d *Daemon) {
 		ClientCAs:    caCertPool,
 	}
 
-	listen := fmt.Sprintf("%s:%d", d.Address, d.Port)
+	listen := fmt.Sprintf("%s:%d", s.Address, s.Port)
 	server := http.Server{
 		Addr:      listen,
 		TLSConfig: tlsConfig,
@@ -233,9 +232,9 @@ func runServer(d *Daemon) {
 	http.HandleFunc("POST /dir/", handleDirectoryEntries)
 	http.HandleFunc("POST /mkdir/", handleDirectoryCreate)
 	http.HandleFunc("POST /rmdir/", handleDirectoryDestroy)
-	http.HandleFunc("POST /get/", handleFileGet)
+	http.HandleFunc("POST /get/", s.handleFileGet)
 
-	log.Printf("%s v%s server listening on %s in TLS mode\n", d.Name, d.Version, server.Addr)
+	log.Printf("%s v%s server listening on %s in TLS mode\n", s.Name, s.Version, server.Addr)
 	go func() {
 		err := server.ListenAndServeTLS("", "")
 		if err != nil && err != http.ErrServerClosed {
@@ -243,25 +242,109 @@ func runServer(d *Daemon) {
 		}
 	}()
 
-	log.Println("runServer: sending 'started'")
-	d.started <- struct{}{}
-	log.Println("runServer: sent 'started'")
+	go s.runAutoDelete()
+
+	if s.verbose {
+		log.Println("runServer: sending 'started'")
+	}
+	s.started <- struct{}{}
+	if s.verbose {
+		log.Println("runServer: sent 'started'")
+	}
 
 	defer func() {
-		log.Println("runServer.exit: sending 'shutdownComplete'")
-		d.shutdownComplete <- struct{}{}
-		log.Println("runServer.exit: sent 'shutdownComplete'")
+		if s.verbose {
+			log.Println("runServer.exit: sending 'shutdownComplete'")
+		}
+		s.shutdownComplete <- struct{}{}
+		if s.verbose {
+			log.Println("runServer.exit: sent 'shutdownComplete'")
+		}
 	}()
 
-	log.Println("runServer: awaiting 'shutdownRequest'")
-	<-d.shutdownRequest
-	log.Println("runServer: received 'shutdownRequest'")
+	if s.verbose {
+		log.Println("runServer: awaiting 'shutdownRequest'")
+	}
+	<-s.shutdownRequest
+	if s.verbose {
+		log.Println("runServer: received 'shutdownRequest'")
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(d.shutdownTimeoutSeconds)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.shutdownTimeoutSeconds)*time.Second)
 	defer cancel()
 
 	err = server.Shutdown(ctx)
 	if err != nil {
 		log.Fatalln("Server Shutdown failed: ", err)
+	}
+
+	s.stopAutoDelete()
+}
+
+func (s *WinexecServer) stopAutoDelete() {
+	if s.verbose {
+		log.Println("sending autoDeleteStopRequest")
+	}
+	s.autoDeleteStopRequest <- struct{}{}
+	if s.verbose {
+		log.Printf("awaiting autoDelete shutdown...")
+	}
+	s.autoDeleteWaiter.Wait()
+	if s.verbose {
+		log.Printf("autoDelete shutdown complete")
+	}
+}
+
+func (s *WinexecServer) setAutoDelete(pathname string, seconds int) {
+	if s.verbose {
+		log.Printf("setAutoDelete(%s, %d)\n", pathname, seconds)
+	}
+	if seconds != 0 {
+		s.autoDeleteFiles[pathname] = time.Now().Add(time.Duration(int64(seconds)) * time.Second)
+	}
+}
+
+func (s *WinexecServer) checkAutoDelete(shutdown bool) {
+	if s.verbose {
+		log.Printf("checkAutoDelete(shutdown=%v)\n", shutdown)
+	}
+	expiredFiles := []string{}
+	for filename, expireTime := range s.autoDeleteFiles {
+		if shutdown || time.Now().After(expireTime) {
+			expiredFiles = append(expiredFiles, filename)
+			if s.verbose {
+				log.Printf("autoDeleting: %s\n", filename)
+			}
+			err := os.Remove(filename)
+			if err != nil {
+				Warning("autodelete failed: %v", Fatal(err))
+			}
+		}
+	}
+	for _, filename := range expiredFiles {
+		delete(s.autoDeleteFiles, filename)
+	}
+}
+
+func (s *WinexecServer) runAutoDelete() {
+	s.autoDeleteWaiter.Add(1)
+	defer s.autoDeleteWaiter.Done()
+	if s.verbose {
+		defer log.Println("runAutoDelete: exiting")
+		log.Println("runAutoDelete: started")
+	}
+	timer := time.NewTimer(time.Duration(s.autoDeleteIntervalSeconds) * time.Second)
+	for {
+		select {
+		case <-s.autoDeleteStopRequest:
+			timer.Stop()
+			if s.verbose {
+				log.Printf("runAutoDelete: received autoDeleteStopRequest")
+			}
+			s.checkAutoDelete(true)
+			return
+		case <-timer.C:
+			s.checkAutoDelete(false)
+		}
 	}
 }

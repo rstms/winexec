@@ -138,7 +138,7 @@ func (c *WinexecClient) Upload(dst, src string, force bool) error {
 		return Fatal(err)
 	}
 	request := message.FileUploadRequest{
-		Pathname:  c.WindowsPath(dst),
+		Pathname:  WindowsPath(dst),
 		Content:   data,
 		Timestamp: fileinfo.ModTime(),
 		Mode:      fileinfo.Mode(),
@@ -166,7 +166,7 @@ func (c *WinexecClient) Download(dst, src string) error {
 		log.Printf("winexec Download(%s %s)\n", dst, src)
 	}
 	request := message.FileDownloadRequest{
-		Pathname: c.WindowsPath(src),
+		Pathname: WindowsPath(src),
 	}
 	if c.debug {
 		log.Printf("winexec download request: %+v\n", request)
@@ -206,7 +206,7 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 		return Fatal(err)
 	}
 	request := message.FileGetRequest{
-		Pathname: c.WindowsPath(dst),
+		Pathname: WindowsPath(dst),
 		URL:      url,
 		CA:       caData,
 		Cert:     certData,
@@ -231,7 +231,7 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 }
 
 // convert a local path to a windows path
-func (c *WinexecClient) WindowsPath(localPath string) string {
+func WindowsPath(localPath string) string {
 	if strings.Contains(localPath, `\`) {
 		log.Println("has windows separators")
 		localPath = strings.ReplaceAll(localPath, `\`, "/")
@@ -308,7 +308,7 @@ func (c *WinexecClient) DirEntries(pathname string) (map[string]message.Director
 		log.Printf("winexec DirEntries(%s)\n", pathname)
 	}
 	request := message.DirectoryRequest{
-		Pathname: c.WindowsPath(pathname),
+		Pathname: WindowsPath(pathname),
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
@@ -336,7 +336,7 @@ func (c *WinexecClient) MkdirAll(pathname string, mode fs.FileMode) error {
 		log.Printf("winexec MkdirAll(%s, %v)\n", pathname, mode)
 	}
 	request := message.DirectoryCreateRequest{
-		Pathname: c.WindowsPath(pathname),
+		Pathname: WindowsPath(pathname),
 		Mode:     mode,
 	}
 	if c.debug {
@@ -361,7 +361,7 @@ func (c *WinexecClient) RemoveAll(pathname string) error {
 		log.Printf("winexec RemoveAll(%s)\n", pathname)
 	}
 	request := message.DirectoryDestroyRequest{
-		Pathname: c.WindowsPath(pathname),
+		Pathname: WindowsPath(pathname),
 	}
 	if c.debug {
 		log.Printf("winexec directory request: %+v\n", request)
