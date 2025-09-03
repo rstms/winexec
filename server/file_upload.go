@@ -11,7 +11,7 @@ import (
 
 func handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
-		log.Printf("%s -> %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
+		log.Printf("%s -> winexec %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
 	}
 	var request message.FileUploadRequest
 	err := json.NewDecoder(r.Body).Decode(&request)

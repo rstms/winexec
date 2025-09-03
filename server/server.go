@@ -135,25 +135,33 @@ func (s *WinexecServer) Stop() error {
 	return nil
 }
 
-func (s *WinexecServer) Run(message string) error {
+func (s *WinexecServer) Run() error {
 	err := s.Start()
 	if err != nil {
 		return err
 	}
+	if ViperGetBool("verbose") {
+		log.Println("CTRL-C to exit")
+	}
 	sigint := make(chan os.Signal)
 	signal.Notify(sigint, syscall.SIGINT)
-	if message != "" {
-		fmt.Println(message)
-	}
+	sigterm := make(chan os.Signal)
+	signal.Notify(sigterm, syscall.SIGTERM)
 	select {
 	case <-sigint:
-		log.Println("Run: received SIGINT")
+		log.Println("\nreceived SIGINT")
+		err = s.Stop()
+		if err != nil {
+			return err
+		}
+	case <-sigterm:
+		log.Println("\nreceived SIGTERM")
 		err = s.Stop()
 		if err != nil {
 			return err
 		}
 	case <-s.shutdownComplete:
-		log.Println("Run: received shutdownComplete")
+		log.Println("\nreceived shutdownComplete")
 	}
 	return nil
 }
@@ -163,8 +171,8 @@ func fail(w http.ResponseWriter, r *http.Request, failMessage string, status int
 		Success: false,
 		Message: failMessage,
 	}
-	if Debug {
-		log.Printf("%s <- [%d] %s\n", r.RemoteAddr, status, failMessage)
+	if Verbose {
+		log.Printf("%s <- winexec fail [%d] %s\n", r.RemoteAddr, status, failMessage)
 	}
 	w.WriteHeader(status)
 	err := json.NewEncoder(w).Encode(&response)
@@ -174,8 +182,8 @@ func fail(w http.ResponseWriter, r *http.Request, failMessage string, status int
 }
 
 func succeed(w http.ResponseWriter, r *http.Request, response interface{}) {
-	if Debug {
-		log.Printf("%s <- [200] %+v\n", r.RemoteAddr, response)
+	if Verbose {
+		log.Printf("%s <- winexec response [200] %+v\n", r.RemoteAddr, response)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(response)

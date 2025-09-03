@@ -56,13 +56,9 @@ to quickly create a Cobra application.`,
 		if ViperGetBool("debug") {
 			fmt.Println(FormatJSON(daemon.GetConfig()))
 		}
-		var message string
-		if ViperGetBool("verbose") {
-			message = "CTRL-C to shutdown"
-		}
 		runCommand("startup")
 		defer runCommand("shutdown")
-		err = daemon.Run(message)
+		err = daemon.Run()
 		cobra.CheckErr(err)
 	},
 }
