@@ -24,7 +24,7 @@ const Version = "1.1.25"
 const DEFAULT_BIND_ADDRESS = "127.0.0.1"
 const DEFAULT_HTTPS_PORT = 10080
 const DEFAULT_SHUTDOWN_TIMEOUT_SECONDS = 5
-const DEFAULT_AUTODELETE_INTERVAL_SECONDS = 5
+const DEFAULT_AUTODELETE_INTERVAL_SECONDS = 60
 
 var Verbose bool
 var Debug bool
@@ -313,16 +313,14 @@ func (s *WinexecServer) setAutoDelete(pathname string, seconds int) {
 }
 
 func (s *WinexecServer) checkAutoDelete(shutdown bool) {
-	if s.verbose {
+	if s.debug {
 		log.Printf("checkAutoDelete(shutdown=%v)\n", shutdown)
 	}
 	expiredFiles := []string{}
 	for filename, expireTime := range s.autoDeleteFiles {
 		if shutdown || time.Now().After(expireTime) {
 			expiredFiles = append(expiredFiles, filename)
-			if s.verbose {
-				log.Printf("autoDeleting: %s\n", filename)
-			}
+			log.Printf("autoDeleting: %s\n", filename)
 			err := os.Remove(filename)
 			if err != nil {
 				Warning("autodelete failed: %v", Fatal(err))
