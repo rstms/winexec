@@ -333,17 +333,17 @@ func (s *WinexecServer) runAutoDelete() {
 		defer log.Println("runAutoDelete: exiting")
 		log.Println("runAutoDelete: started")
 	}
-	timer := time.NewTimer(time.Duration(s.autoDeleteIntervalSeconds) * time.Second)
+	ticker := time.NewTicker(time.Duration(s.autoDeleteIntervalSeconds) * time.Second)
 	for {
 		select {
 		case <-s.autoDeleteStopRequest:
-			timer.Stop()
+			ticker.Stop()
 			if s.verbose {
 				log.Printf("runAutoDelete: received autoDeleteStopRequest")
 			}
 			s.checkAutoDelete(true)
 			return
-		case <-timer.C:
+		case <-ticker.C:
 			s.checkAutoDelete(false)
 		}
 	}
