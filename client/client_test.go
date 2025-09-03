@@ -176,9 +176,17 @@ func TestUploadFile(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestGetISO(t *testing.T) {
+func TestGetISOQuickDelete(t *testing.T) {
 	c := initClient(t)
 	testURL := ViperGetString("test_iso_url")
-	err := c.GetISO("/c/tmp/testfile.iso", testURL, "", "", "")
+	seconds := 5
+	err := c.GetISO("/c/tmp/testfile.iso", testURL, "", "", "", &seconds)
+	require.Nil(t, err)
+}
+
+func TestGetISODefaultDelete(t *testing.T) {
+	c := initClient(t)
+	testURL := ViperGetString("test_iso_url")
+	err := c.GetISO("/c/tmp/testfile_default.iso", testURL, "", "", "", nil)
 	require.Nil(t, err)
 }

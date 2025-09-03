@@ -18,7 +18,7 @@ const DEFAULT_AUTO_DELETE_SECONDS = 300
 type WinexecClient struct {
 	api               APIClient
 	debug             bool
-	autoDeleteSeconds int
+	AutoDeleteSeconds int
 }
 
 func viperPrefix() string {
@@ -57,7 +57,7 @@ func NewWinexecClient() (*WinexecClient, error) {
 	client := WinexecClient{
 		api:               api,
 		debug:             debug,
-		autoDeleteSeconds: seconds,
+		AutoDeleteSeconds: seconds,
 	}
 
 	return &client, nil
@@ -195,9 +195,12 @@ func (c *WinexecClient) Download(dst, src string) error {
 	return nil
 }
 
-func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
+func (c *WinexecClient) GetISO(dst, url, ca, cert, key string, autoDeleteSeconds *int) error {
 	if c.debug {
-		log.Printf("winexec GetISO(%s %s %s %s %s)\n", dst, url, ca, cert, key)
+		log.Printf("winexec GetISO(%s, %s, %s, %s, %s, %d)\n", dst, url, ca, cert, key, autoDeleteSeconds)
+	}
+	if autoDeleteSeconds == nil {
+		autoDeleteSeconds = &c.AutoDeleteSeconds
 	}
 	var err error
 	var caData []byte
@@ -227,7 +230,7 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 		CA:                caData,
 		Cert:              certData,
 		Key:               keyData,
-		AutoDeleteSeconds: c.autoDeleteSeconds,
+		AutoDeleteSeconds: *autoDeleteSeconds,
 	}
 
 	if c.debug {
