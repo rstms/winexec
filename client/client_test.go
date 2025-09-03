@@ -175,3 +175,10 @@ func TestUploadFile(t *testing.T) {
 	err = c.RemoveAll(testDir)
 	require.Nil(t, err)
 }
+
+func TestGetISO(t *testing.T) {
+	c := initClient(t)
+	testURL := ViperGetString("test_iso_url")
+	err := c.GetISO("/c/tmp/testfile.iso", testURL, "", "", "")
+	require.Nil(t, err)
+}

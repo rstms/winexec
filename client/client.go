@@ -13,9 +13,12 @@ import (
 
 const Version = "1.1.20"
 
+const DEFAULT_AUTO_DELETE_SECONDS = 300
+
 type WinexecClient struct {
-	api   APIClient
-	debug bool
+	api               APIClient
+	debug             bool
+	autoDeleteSeconds int
 }
 
 func viperPrefix() string {
@@ -29,11 +32,13 @@ func viperPrefix() string {
 func NewWinexecClient() (*WinexecClient, error) {
 
 	prefix := viperPrefix()
+	ViperSetDefault(prefix+"auto_delete_seconds", DEFAULT_AUTO_DELETE_SECONDS)
 	url := ViperGetString(prefix + "url")
 	cert := ViperGetString(prefix + "cert")
 	key := ViperGetString(prefix + "key")
 	ca := ViperGetString(prefix + "ca")
 	debug := ViperGetBool(prefix + "debug")
+	seconds := ViperGetInt(prefix + "auto_delete_seconds")
 
 	if ViperGetBool("verbose") {
 		log.Printf("NewWinexecClient: %s\n", FormatJSON(&map[string]any{
@@ -50,8 +55,9 @@ func NewWinexecClient() (*WinexecClient, error) {
 		return nil, Fatal(err)
 	}
 	client := WinexecClient{
-		api:   api,
-		debug: debug,
+		api:               api,
+		debug:             debug,
+		autoDeleteSeconds: seconds,
 	}
 
 	return &client, nil
@@ -193,24 +199,35 @@ func (c *WinexecClient) GetISO(dst, url, ca, cert, key string) error {
 	if c.debug {
 		log.Printf("winexec GetISO(%s %s %s %s %s)\n", dst, url, ca, cert, key)
 	}
-	caData, err := os.ReadFile(ca)
-	if err != nil {
-		return Fatal(err)
+	var err error
+	var caData []byte
+	if ca != "" {
+		caData, err = os.ReadFile(ca)
+		if err != nil {
+			return Fatal(err)
+		}
 	}
-	certData, err := os.ReadFile(cert)
-	if err != nil {
-		return Fatal(err)
+	var certData []byte
+	if cert != "" {
+		certData, err = os.ReadFile(cert)
+		if err != nil {
+			return Fatal(err)
+		}
 	}
-	keyData, err := os.ReadFile(key)
-	if err != nil {
-		return Fatal(err)
+	var keyData []byte
+	if key != "" {
+		keyData, err = os.ReadFile(key)
+		if err != nil {
+			return Fatal(err)
+		}
 	}
 	request := message.FileGetRequest{
-		Pathname: WindowsPath(dst),
-		URL:      url,
-		CA:       caData,
-		Cert:     certData,
-		Key:      keyData,
+		Pathname:          WindowsPath(dst),
+		URL:               url,
+		CA:                caData,
+		Cert:              certData,
+		Key:               keyData,
+		AutoDeleteSeconds: c.autoDeleteSeconds,
 	}
 
 	if c.debug {

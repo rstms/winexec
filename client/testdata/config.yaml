@@ -5,6 +5,7 @@ test:
   files_dir: /users/${USER}/Downloads
   subs_dir: //./h/vmware
   user_file: /c/users/mkrueger/howdy.txt
+  test_iso_url: "http://ca.rstms.net/keymaster.pem"
   winexec:
     client: 
       url: https://${WINEXEC_HOST}:10080
