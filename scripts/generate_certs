@@ -11,7 +11,7 @@ echo updating certificates in $dir
 (
     cd $dir
     mkcert --force --chain ca.pem
-    mkcert --force 127.0.0.1 --cert-file cert.pem --key-file key.pem --duration 10y -- --san localhost
+    mkcert --force 127.0.0.1 --cert-file cert.pem --key-file key.pem --duration 1y -- --san localhost
 )
 touch $config
 echo adding ceritifcates to config file $config
