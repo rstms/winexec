@@ -4,7 +4,7 @@ go 1.24.5
 
 require (
 	github.com/getlantern/systray v1.2.2
-	github.com/rstms/go-common v0.2.22
+	github.com/rstms/go-common v0.2.51
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0

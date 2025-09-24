@@ -10,7 +10,7 @@ type FailResponse struct {
 	Message string
 }
 
-type PingResponse struct {
+type SuccessResponse struct {
 	Success bool
 	Message string
 }
@@ -18,6 +18,7 @@ type PingResponse struct {
 type ExecRequest struct {
 	Command string
 	Args    []string
+	Env     []string
 }
 
 type ExecResponse struct {
@@ -27,6 +28,12 @@ type ExecResponse struct {
 	ExitCode int
 	Stdout   string
 	Stderr   string
+}
+
+type SpawnRequest struct {
+	Command string
+	Args    []string
+	Env     []string
 }
 
 type SpawnResponse struct {
@@ -73,9 +80,13 @@ type FileUploadRequest struct {
 	Force     bool
 }
 
-type FileUploadResponse struct {
+type FileResponse struct {
 	Success  bool
 	Message  string
+	Pathname string
+}
+
+type FileDeleteRequest struct {
 	Pathname string
 }
 
@@ -104,4 +115,35 @@ type DirectoryResponse struct {
 	Message  string
 	Pathname string
 	Entries  map[string]DirectoryEntry
+}
+
+type GetOSResponse struct {
+	Success bool
+	Message string
+	OS      string
+}
+
+type IsRequest struct {
+	Pathname string
+}
+
+type IsResponse struct {
+	Success  bool
+	Message  string
+	Pathname string
+	Result   bool
+}
+
+type NetbootConfig struct {
+	Address           string `json:"address"`
+	OS                string `json:"os"`
+	Version           string `json:"version"`
+	Arch              string `json:"arch"`
+	Serial            string `json:"serial"`
+	Mirror            string `json:"mirror"`
+	Response          string `json:"response"`
+	DisklabelTemplate string `json:"disklabel_template"`
+	KernelParams      string `json:"kernel_params"`
+	Debug             bool   `json:"debug"`
+	Quiet             bool   `json:"quiet"`
 }

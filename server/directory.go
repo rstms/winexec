@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"github.com/rstms/winexec/message"
+	"github.com/rstms/winexec/ospath"
 	"log"
 	"net/http"
 	"os"
@@ -41,14 +42,16 @@ func handleDirectoryCreate(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%+v\n", request)
 	}
 
+	pathname := ospath.LocalPath(request.Pathname)
+
 	response := message.DirectoryResponse{
 		Success:  true,
-		Pathname: request.Pathname,
+		Pathname: pathname,
 	}
-	if failIfDir(request.Pathname, w, r) {
+	if failIfDir(pathname, w, r) {
 		return
 	}
-	err = os.MkdirAll(request.Pathname, request.Mode)
+	err = os.MkdirAll(pathname, request.Mode)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "create failed", http.StatusBadRequest)
@@ -73,15 +76,17 @@ func handleDirectoryDestroy(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%+v\n", request)
 	}
 
+	pathname := ospath.LocalPath(request.Pathname)
+
 	response := message.DirectoryResponse{
 		Success:  true,
-		Pathname: request.Pathname,
+		Pathname: pathname,
 		Message:  "destroyed",
 	}
-	if failIfNotDir(request.Pathname, w, r) {
+	if failIfNotDir(pathname, w, r) {
 		return
 	}
-	err = os.RemoveAll(request.Pathname)
+	err = os.RemoveAll(pathname)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "destroy failed", http.StatusBadRequest)
@@ -105,17 +110,19 @@ func handleDirectoryEntries(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%+v\n", request)
 	}
 
-	if failIfNotDir(request.Pathname, w, r) {
+	pathname := ospath.LocalPath(request.Pathname)
+
+	if failIfNotDir(pathname, w, r) {
 		return
 	}
 
 	response := message.DirectoryResponse{
 		Success:  true,
-		Pathname: request.Pathname,
+		Pathname: pathname,
 		Message:  "entries",
 		Entries:  make(map[string]message.DirectoryEntry),
 	}
-	entries, err := os.ReadDir(request.Pathname)
+	entries, err := os.ReadDir(pathname)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "failed reading directory", http.StatusInternalServerError)

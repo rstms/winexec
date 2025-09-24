@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const Version = "1.1.26"
+const Version = "1.2.0"
 
 const DEFAULT_BIND_ADDRESS = "127.0.0.1"
 const DEFAULT_HTTPS_PORT = 10080
@@ -44,11 +44,17 @@ type WinexecServer struct {
 	shutdownTimeoutSeconds int
 	debug                  bool
 	verbose                bool
+	enableGUI              bool
 
 	autoDeleteFiles           map[string]time.Time
 	autoDeleteWaiter          sync.WaitGroup
 	autoDeleteIntervalSeconds int
 	autoDeleteStopRequest     chan struct{}
+
+	startupCommand      string
+	startupCommandArgs  []string
+	shutdownCommand     string
+	shutdownCommandArgs []string
 }
 
 func viperPrefix() string {
@@ -65,12 +71,12 @@ func NewWinexecServer() (*WinexecServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	configDir := filepath.Join(userConfigDir, "winexec")
+	configDir := filepath.Join(userConfigDir, ProgramName())
 	ViperSetDefault(prefix+"bind_address", DEFAULT_BIND_ADDRESS)
 	ViperSetDefault(prefix+"https_port", DEFAULT_HTTPS_PORT)
-	ViperSetDefault(prefix+"ca", filepath.Join(configDir, "ca.pem"))
-	ViperSetDefault(prefix+"cert", filepath.Join(configDir, "cert.pem"))
-	ViperSetDefault(prefix+"key", filepath.Join(configDir, "key.pem"))
+	ViperSetDefault(prefix+"ca", filepath.Join(configDir, "keymaster.pem"))
+	ViperSetDefault(prefix+"cert", filepath.Join(configDir, "winexec-server-cert.pem"))
+	ViperSetDefault(prefix+"key", filepath.Join(configDir, "winexec-server-key.pem"))
 	ViperSetDefault(prefix+"shutdown_timeout_seconds", DEFAULT_SHUTDOWN_TIMEOUT_SECONDS)
 	ViperSetDefault(prefix+"autodelete_interval_seconds", DEFAULT_AUTODELETE_INTERVAL_SECONDS)
 
@@ -91,6 +97,11 @@ func NewWinexecServer() (*WinexecServer, error) {
 		autoDeleteIntervalSeconds: ViperGetInt(prefix + "autodelete_interval_seconds"),
 		autoDeleteFiles:           make(map[string]time.Time),
 		autoDeleteStopRequest:     make(chan struct{}),
+		enableGUI:                 ViperGetBool(prefix + "enable_gui"),
+		startupCommand:            ViperGetString(prefix + "startup_command"),
+		startupCommandArgs:        ViperGetStringSlice(prefix + "startup_command_args"),
+		shutdownCommand:           ViperGetString(prefix + "shutdown_command"),
+		shutdownCommandArgs:       ViperGetStringSlice(prefix + "shutdown_command_args"),
 	}
 	Verbose = s.verbose
 	Debug = s.debug
@@ -117,12 +128,14 @@ func (s *WinexecServer) Start() error {
 	log.Println("awaiting 'started' message...")
 	<-s.started
 	log.Println("received 'started' message")
-	title := fmt.Sprintf("%s v%s", s.Name, s.Version)
-	menu, err := NewMenu(title, s.shutdownRequest, s.shutdownComplete)
-	if err != nil {
-		return err
+	if s.enableGUI {
+		title := fmt.Sprintf("%s v%s", s.Name, s.Version)
+		menu, err := NewMenu(title, s.shutdownRequest, s.shutdownComplete)
+		if err != nil {
+			return err
+		}
+		s.menu = menu
 	}
-	s.menu = menu
 	return nil
 }
 
@@ -194,6 +207,13 @@ func succeed(w http.ResponseWriter, r *http.Request, response interface{}) {
 
 func runServer(s *WinexecServer) {
 
+	if s.startupCommand != "" {
+		err := s.runCommand("startup", s.startupCommand, s.startupCommandArgs...)
+		if err != nil {
+			Warning("startup command failed")
+		}
+	}
+
 	serverCertPEM, err := os.ReadFile(s.cert)
 	if err != nil {
 		log.Fatalf("Failed reading server certificate: %v", err)
@@ -233,14 +253,18 @@ func runServer(s *WinexecServer) {
 	}
 
 	http.HandleFunc("GET /ping/", handlePing)
+	http.HandleFunc("GET /os/", handleGetOS)
 	http.HandleFunc("POST /exec/", handleExec)
 	http.HandleFunc("POST /spawn/", handleSpawn)
 	http.HandleFunc("POST /download/", handleFileDownload)
 	http.HandleFunc("POST /upload/", handleFileUpload)
+	http.HandleFunc("POST /delete/", handleFileDelete)
 	http.HandleFunc("POST /dir/", handleDirectoryEntries)
 	http.HandleFunc("POST /mkdir/", handleDirectoryCreate)
 	http.HandleFunc("POST /rmdir/", handleDirectoryDestroy)
 	http.HandleFunc("POST /get/", s.handleFileGet)
+	http.HandleFunc("POST /isfile/", s.handleIsFile)
+	http.HandleFunc("POST /isdir/", s.handleIsDir)
 
 	log.Printf("%s v%s server listening on %s in TLS mode\n", s.Name, s.Version, server.Addr)
 	go func() {
@@ -287,6 +311,13 @@ func runServer(s *WinexecServer) {
 	}
 
 	s.stopAutoDelete()
+
+	if s.shutdownCommand != "" {
+		err := s.runCommand("shutdown", s.shutdownCommand, s.shutdownCommandArgs...)
+		if err != nil {
+			Warning("shutdown command failed")
+		}
+	}
 }
 
 func (s *WinexecServer) stopAutoDelete() {

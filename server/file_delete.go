@@ -2,18 +2,18 @@ package server
 
 import (
 	"encoding/json"
-	"github.com/rstms/winexec/geturl"
 	"github.com/rstms/winexec/message"
 	"github.com/rstms/winexec/ospath"
 	"log"
 	"net/http"
+	"os"
 )
 
-func (s *WinexecServer) handleFileGet(w http.ResponseWriter, r *http.Request) {
+func handleFileDelete(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
 		log.Printf("%s -> winexec %s %s\n", r.RemoteAddr, r.Method, r.URL.Path)
 	}
-	var request message.FileGetRequest
+	var request message.FileDeleteRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		Warning("%v", Fatal(err))
@@ -23,23 +23,21 @@ func (s *WinexecServer) handleFileGet(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
 		log.Printf("%+v\n", request)
 	}
-
 	pathname := ospath.LocalPath(request.Pathname)
-
-	count, err := geturl.GetURL(pathname, request.URL, request.CA, request.Cert, request.Key)
-	if err != nil {
-		Warning("%v", Fatal(err))
-		fail(w, r, "get request failed", http.StatusBadRequest)
-		return
-	}
-
-	s.setAutoDelete(pathname, request.AutoDeleteSeconds)
-
-	response := message.FileGetResponse{
+	response := message.FileResponse{
 		Success:  true,
-		Message:  "downloaded",
+		Message:  "deleted",
 		Pathname: pathname,
-		Bytes:    count,
+	}
+	if IsFile(pathname) {
+		err := os.Remove(pathname)
+		if err != nil {
+			Warning("%v", Fatal(err))
+			fail(w, r, "delete failed", http.StatusBadRequest)
+			return
+		}
+	} else {
+		response.Message = "file not present"
 	}
 	succeed(w, r, &response)
 }

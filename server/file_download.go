@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"github.com/rstms/winexec/message"
+	"github.com/rstms/winexec/ospath"
 	"log"
 	"net/http"
 	"os"
@@ -22,7 +23,8 @@ func handleFileDownload(w http.ResponseWriter, r *http.Request) {
 	if Verbose {
 		log.Printf("%+v\n", request)
 	}
-	srcPathname := request.Pathname
+	srcPathname := ospath.LocalPath(request.Pathname)
+
 	fileinfo, err := os.Stat(srcPathname)
 	if err != nil {
 		Warning("%v", Fatal(err))

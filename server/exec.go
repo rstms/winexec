@@ -7,6 +7,7 @@ import (
 	"github.com/rstms/winexec/message"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 )
 
@@ -24,7 +25,7 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%+v\n", request)
 	}
 
-	command, exit, stdout, stderr, err := run(request.Command, request.Args...)
+	command, exit, stdout, stderr, err := run(request.Env, request.Command, request.Args...)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "exec failed", http.StatusBadRequest)
@@ -41,7 +42,7 @@ func handleExec(w http.ResponseWriter, r *http.Request) {
 	succeed(w, r, &response)
 }
 
-func run(command string, args ...string) (string, int, string, string, error) {
+func run(env []string, command string, args ...string) (string, int, string, string, error) {
 	if Debug {
 		log.Printf("Run: %s %v\n", command, args)
 	}
@@ -51,6 +52,9 @@ func run(command string, args ...string) (string, int, string, string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	exitCode := 0
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	err := cmd.Run()
 	if err != nil {
 		switch e := err.(type) {

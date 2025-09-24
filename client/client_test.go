@@ -27,6 +27,7 @@ func dumpConfig(t *testing.T) {
 }
 
 func initTestConfig(t *testing.T) {
+	require.NotEmpty(t, os.Getenv("WINEXEC_HOST"))
 	testFile := filepath.Join("testdata", "config.yaml")
 	Init("test", Version, testFile)
 	ViperSet("debug", true)
@@ -39,7 +40,7 @@ func initClient(t *testing.T) *WinexecClient {
 	return c
 }
 
-func TestFileDownload(t *testing.T) {
+func TestWinexecClientFileDownload(t *testing.T) {
 	c := initClient(t)
 	testUserFile := ViperGetString("user_file")
 	_, filename := filepath.Split(testUserFile)
@@ -52,30 +53,7 @@ func TestFileDownload(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestWindowsPath(t *testing.T) {
-	w := WindowsPath("/foo/moo.txt")
-	require.Equal(t, `\foo\moo.txt`, w)
-	w = WindowsPath("/c/foo.ext")
-	require.Equal(t, `C:\foo.ext`, w)
-	w = WindowsPath("/C/foo/bar/baz.ext")
-	require.Equal(t, `C:\foo\bar\baz.ext`, w)
-	w = WindowsPath(`C:\foo\bar\baz.ext`)
-	require.Equal(t, `C:\foo\bar\baz.ext`, w)
-	w = WindowsPath(`a:config.sys`)
-	require.Equal(t, `A:config.sys`, w)
-	w = WindowsPath(`s:foo\moo\goo.ext`)
-	require.Equal(t, `S:foo\moo\goo.ext`, w)
-	w = WindowsPath(`\\localhost\c$\tmp\foo`)
-	require.Equal(t, `C:\tmp\foo`, w)
-	w = WindowsPath("//./D/fleem/")
-	require.Equal(t, `D:\fleem\`, w)
-	w = WindowsPath("//./D$/fleem/")
-	require.Equal(t, `D:\fleem\`, w)
-	w = WindowsPath("//./D:/fleem/")
-	require.Equal(t, `D:\fleem\`, w)
-}
-
-func TestDirFiles(t *testing.T) {
+func TestWinexecClientDirFiles(t *testing.T) {
 	c := initClient(t)
 	testFilesDir := ViperGetString("files_dir")
 	files, err := c.DirFiles(testFilesDir)
@@ -88,7 +66,7 @@ func TestDirFiles(t *testing.T) {
 	}
 }
 
-func TestDirSubs(t *testing.T) {
+func TestWinexecClientDirSubs(t *testing.T) {
 	c := initClient(t)
 	testSubsDir := ViperGetString("subs_dir")
 	subs, err := c.DirSubs(testSubsDir)
@@ -101,7 +79,7 @@ func TestDirSubs(t *testing.T) {
 	}
 }
 
-func TestDirEntries(t *testing.T) {
+func TestWinexecClientDirEntries(t *testing.T) {
 	c := initClient(t)
 	entries, err := c.DirEntries(`c:\tmp`)
 	require.Nil(t, err)
@@ -123,7 +101,7 @@ func TestDirEntries(t *testing.T) {
 	}
 }
 
-func TestMkdir(t *testing.T) {
+func TestWinexecClientMkdir(t *testing.T) {
 	c := initClient(t)
 	err := c.RemoveAll("/c/tmp/foo")
 	before, err := c.DirSubs("/c/tmp")
@@ -142,7 +120,7 @@ func TestMkdir(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestUploadFile(t *testing.T) {
+func TestWinexecClientUploadFile(t *testing.T) {
 	c := initClient(t)
 
 	testDir := "/c/tmp/upload_test"
@@ -176,7 +154,7 @@ func TestUploadFile(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestGetISOQuickDelete(t *testing.T) {
+func TestWinexecClientGetISOQuickDelete(t *testing.T) {
 	c := initClient(t)
 	testURL := ViperGetString("test_iso_url")
 	seconds := 5
@@ -184,7 +162,7 @@ func TestGetISOQuickDelete(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func TestGetISODefaultDelete(t *testing.T) {
+func TestWinexecClientGetISODefaultDelete(t *testing.T) {
 	c := initClient(t)
 	testURL := ViperGetString("test_iso_url")
 	err := c.GetISO("/c/tmp/testfile_default.iso", testURL, "", "", "", nil)

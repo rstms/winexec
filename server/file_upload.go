@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"github.com/rstms/winexec/message"
+	"github.com/rstms/winexec/ospath"
 	"log"
 	"net/http"
 	"os"
@@ -32,23 +33,25 @@ func handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = os.WriteFile(request.Pathname, request.Content, request.Mode)
+	pathname := ospath.LocalPath(request.Pathname)
+
+	err = os.WriteFile(pathname, request.Content, request.Mode)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "write failed", http.StatusBadRequest)
 		return
 	}
-	err = os.Chtimes(request.Pathname, time.Time{}, request.Timestamp)
+	err = os.Chtimes(pathname, time.Time{}, request.Timestamp)
 	if err != nil {
 		Warning("%v", Fatal(err))
 		fail(w, r, "time update failed", http.StatusBadRequest)
 		return
 
 	}
-	response := message.FileDownloadResponse{
+	response := message.FileResponse{
 		Success:  true,
 		Message:  "uploaded",
-		Pathname: request.Pathname,
+		Pathname: pathname,
 	}
 	succeed(w, r, &response)
 }

@@ -1,4 +1,4 @@
-//go:build !openbsd
+//go:build windows
 
 package server
 
@@ -53,7 +53,7 @@ func (m *Menu) onReady() {
 }
 
 func (m *Menu) onExit() {
-	log.Printf("onExit: received gui shutdown event\n")
+	log.Printf("onExit: received exit event\n")
 	m.shutdownRequest <- struct{}{}
-	log.Printf("onExit: shutdown requested\n")
+	log.Printf("onExit: sent shutdown request\n")
 }

@@ -9,6 +9,6 @@ test:
   winexec:
     client: 
       url: https://${WINEXEC_HOST}:10080
-      ca: testdata/certs/ca.pem
-      cert: testdata/certs/cert.pem
-      key: testdata/certs/key.pem
+      ca: testdata/certs/keymaster.pem
+      cert: testdata/certs/winexec-test-client-cert.pem
+      key: testdata/certs/winexec-test-client-key.pem
