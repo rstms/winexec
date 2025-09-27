@@ -37,9 +37,9 @@ release:
 	@$(if $(update),gh release delete -y v$(version),)
 	gh release create v$(version) --notes "v$(version)"
 
-dist: dist/$(release-binary)
+dist: dist/$(release_binary)
 
-dist/$(release-binary): $(binary)
+dist/$(release_binary): $(binary)
 	mkdir -p dist
 	cp $< $@
 	scp $@ $(dist_host):$(dist_dir)/$(release_binary)
@@ -56,6 +56,7 @@ update-modules:
 clean:
 	rm -f $(binary) *.core 
 	go clean
+	rm -rf dist && mkdir dist
 
 sterile: clean
 	go clean -i || true
@@ -66,3 +67,6 @@ sterile: clean
 	rm -rf ~/.cache/netboot
 	rm -rf cmd/certs/*
 	touch cmd/certs/.placeholder
+
+show-vars:
+	@$(foreach var,$(all_variables),echo $(var)=$($(var));)
