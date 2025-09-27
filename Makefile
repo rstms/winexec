@@ -41,8 +41,9 @@ dist: dist/$(release_binary)
 
 dist/$(release_binary): $(binary)
 	mkdir -p dist
+	scp $< $(dist_target)/$(release_binary)
+	scp $< $(dist_target)/$(dist_binary)
 	cp $< $@
-	scp $@ $(dist_host):$(dist_dir)/$(release_binary)
 
 release-upload: dist
 	cd dist; gh release upload $(latest_release) $(release_binary) $(CLOBBER)
@@ -52,6 +53,7 @@ update-modules:
 	@$(foreach module,$(rstms_modules),go get $(module)@$(call latest_module_release,$(module));)
 	curl -Lso .proxy https://raw.githubusercontent.com/rstms/go-common/master/proxy_common_go
 	@$(foreach s,$(common_go),sed <.proxy >$(s) 's/^package cmd/package $(lastword $(subst /, ,$(dir $(s))))/'; ) rm .proxy
+	$(MAKE)
 
 clean:
 	rm -f $(binary) *.core 
