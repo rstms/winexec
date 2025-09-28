@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+usage() {
+    cat ->&2 <<EOF
+
+usage: $(basename $0) [OPTIONS]
+    -h  hostname
+    -i  ip address
+    -o  output directory
+
+EOF
+    exit 1
+}
+
+fail() {
+    echo >&2 "Error:" "$@"
+    usage
+}
+
+outdir=.
+
+while getopts "h:i:o:" opt "$@"
+do
+    case "$opt" in
+	h) hostname=$OPTARG;;
+	i) ipaddr=$OPTARG;;
+	o) outdir=$OPTARG;;
+    esac
+done
+
+[ -n "$hostname" ] || fail "missing hostname"
+[ -n "$ipaddr" ] || ipaddr=$(dig +short $hostname)
+[ -n "$ipaddr" ] || fail "missing ip address"
+[ -n "$outdir" ] || fail "missing output dir"
+[ -e $outdir ] || fail "output directory not found: $outdir"
+
+( 
+    cd $outdir; 
+    mkcert --force --chain keymaster.pem
+    mkcert --force $hostname  \
+	--cert-file winexec-client-cert.pem \
+	--key-file winexec-client-key.pem \
+	--duration 1y \
+	-- \
+	--san $hostname \
+	--san $ipaddr \
+	--san localhost \
+	--san 127.0.0.1
+)
+ls $outdir

@@ -31,6 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 package cmd
 
 import (
+	"github.com/rstms/cobra-daemon"
 	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
 	"os"
@@ -59,4 +60,5 @@ func Execute() {
 func init() {
 	CobraInit(rootCmd)
 	OptionSwitch(rootCmd, "quiet", "q", "suppress output")
+	daemon.AddDaemonCommands(rootCmd, "server")
 }

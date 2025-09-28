@@ -67,8 +67,6 @@ sterile: clean
 	go clean -modcache
 	rm -f go.mod go.sum
 	rm -rf ~/.cache/netboot
-	rm -rf cmd/certs/*
-	touch cmd/certs/.placeholder
 
 show-vars:
 	@$(foreach var,$(all_variables),echo $(var)=$($(var));)
