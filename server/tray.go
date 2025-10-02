@@ -34,7 +34,7 @@ func (m *Menu) onReady() {
 	systray.SetIcon(iconData)
 
 	// Add menu items
-	systray.AddMenuItem("winexec v"+Version, "winexec server daemon")
+	systray.AddMenuItem("Winexec Server v"+Version, "winexec server daemon")
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Shutdown", "shutdown server and exit")
 	mPing := systray.AddMenuItem("Ping", "write log message")
