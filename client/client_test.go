@@ -35,7 +35,10 @@ func initTestConfig(t *testing.T) {
 
 func initClient(t *testing.T) *WinexecClient {
 	initTestConfig(t)
-	c, err := NewWinexecClient()
+	caFile := filepath.Join("testdata", "certs", "ca.pem")
+	certFile := filepath.Join("testdata", "certs", "cert.pem")
+	keyFile := filepath.Join("testdata", "certs", "key.pem")
+	c, err := NewWinexecClient(caFile, certFile, keyFile)
 	require.Nil(t, err)
 	return c
 }

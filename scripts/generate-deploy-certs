@@ -34,17 +34,17 @@ done
 [ -n "$outdir" ] || fail "missing output dir"
 [ -e $outdir ] || fail "output directory not found: $outdir"
 
+generate_certs() {
+    name=$1
+    mkcert --force $hostname --cert-file ${name}-server-cert.pem --key-file ${name}-server-key.pem --duration 1y \
+	-- --san $hostname --san $ipaddr --san localhost --san 127.0.0.1
+    mkcert --force ${name}-client --cert-file ${name}-client-cert.pem --key-file ${name}-client-key.pem --duration 1y
+}
+
 ( 
-    cd $outdir; 
+    cd $outdir
     mkcert --force --chain keymaster.pem
-    mkcert --force $hostname  \
-	--cert-file winexec-client-cert.pem \
-	--key-file winexec-client-key.pem \
-	--duration 1y \
-	-- \
-	--san $hostname \
-	--san $ipaddr \
-	--san localhost \
-	--san 127.0.0.1
+    generate_certs netboot
+    generate_certs winexec
 )
 ls $outdir
