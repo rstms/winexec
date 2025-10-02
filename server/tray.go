@@ -1,17 +1,13 @@
-//go:build windows
+//go:build !openbsd
 
 package server
 
 import (
 	_ "embed"
-	"fmt"
-	"github.com/getlantern/systray"
+	"github.com/rstms/systray"
 	"log"
 	"runtime"
 )
-
-//go:embed icon.ico
-var iconData []byte
 
 type Menu struct {
 	Title            string
@@ -38,7 +34,10 @@ func (m *Menu) onReady() {
 	systray.SetIcon(iconData)
 
 	// Add menu items
-	mQuit := systray.AddMenuItem(fmt.Sprintf("Quit %v", m.Title), "Shutdown and exit")
+	systray.AddMenuItem("winexec v"+Version, "winexec server daemon")
+	systray.AddSeparator()
+	mQuit := systray.AddMenuItem("Shutdown", "shutdown server and exit")
+	mPing := systray.AddMenuItem("Ping", "write log message")
 
 	// Handle menu item clicks
 	go func() {
@@ -46,6 +45,9 @@ func (m *Menu) onReady() {
 			select {
 			case <-mQuit.ClickedCh:
 				systray.Quit()
+				return
+			case <-mPing.ClickedCh:
+				log.Println("ping")
 			}
 		}
 	}()

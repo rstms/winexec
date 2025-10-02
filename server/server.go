@@ -44,7 +44,7 @@ type WinexecServer struct {
 	shutdownTimeoutSeconds int
 	debug                  bool
 	verbose                bool
-	enableGUI              bool
+	enableMenu             bool
 
 	autoDeleteFiles           map[string]time.Time
 	autoDeleteWaiter          sync.WaitGroup
@@ -97,7 +97,7 @@ func NewWinexecServer() (*WinexecServer, error) {
 		autoDeleteIntervalSeconds: ViperGetInt(prefix + "autodelete_interval_seconds"),
 		autoDeleteFiles:           make(map[string]time.Time),
 		autoDeleteStopRequest:     make(chan struct{}),
-		enableGUI:                 ViperGetBool(prefix + "enable_gui"),
+		enableMenu:                ViperGetBool(prefix + "menu"),
 		startupCommand:            ViperGetString(prefix + "startup_command"),
 		startupCommandArgs:        ViperGetStringSlice(prefix + "startup_command_args"),
 		shutdownCommand:           ViperGetString(prefix + "shutdown_command"),
@@ -128,7 +128,7 @@ func (s *WinexecServer) Start() error {
 	log.Println("awaiting 'started' message...")
 	<-s.started
 	log.Println("received 'started' message")
-	if s.enableGUI {
+	if s.enableMenu {
 		title := fmt.Sprintf("%s v%s", s.Name, s.Version)
 		menu, err := NewMenu(title, s.shutdownRequest, s.shutdownComplete)
 		if err != nil {

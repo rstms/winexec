@@ -33,6 +33,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"github.com/rstms/console"
 	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
 	"log"
@@ -53,6 +54,14 @@ secured by mutual TLS authentication with a private x509 CA
 		cobra.CheckErr(err)
 		if ViperGetBool("debug") {
 			fmt.Println(FormatJSON(daemon.GetConfig()))
+		}
+		if ViperGetBool("server.hide") {
+			err := console.ConsoleHide()
+			cobra.CheckErr(err)
+		}
+		if ViperGetBool("server.minimize") {
+			err := console.ConsoleMinimize()
+			cobra.CheckErr(err)
 		}
 		runCommand("startup")
 		defer runCommand("shutdown")
@@ -93,6 +102,9 @@ func runCommand(state string) {
 
 func init() {
 	CobraAddCommand(rootCmd, rootCmd, serverCmd)
+	OptionSwitch(serverCmd, "menu", "", "enable system tray menu")
+	OptionSwitch(serverCmd, "hide", "", "hide console window")
+	OptionSwitch(serverCmd, "minimize", "", "minimize console window")
 	OptionString(serverCmd, "bind-address", "a", "127.0.0.1", "bind address")
 	OptionString(serverCmd, "https-port", "p", "10080", "listen port")
 	OptionString(serverCmd, "ca", "", "", "certificate authority PEM file")
