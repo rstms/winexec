@@ -19,31 +19,80 @@ fail() {
 
 outdir=.
 
-while getopts "h:i:o:" opt "$@"
+while getopts "h:d:i:o:" opt "$@"
 do
     case "$opt" in
 	h) hostname=$OPTARG;;
+	d) domain=$OPTARG;;
 	i) ipaddr=$OPTARG;;
 	o) outdir=$OPTARG;;
     esac
 done
 
+if [ -z "$hostname" ]; then
+    hostname=$(hostname)
+fi
+
+if echo ${hostname} | grep -q '\.'; then
+    domain=$(echo $hostname | cut -d. -f 2-)
+    hostname=$(echo $hostname | cut -d. -f 1)
+    fqdn=${hostname}.${domain}
+fi
+
+if [ -z "$domain" ]; then
+    if [ -f /etc/myname ]; then
+	domain=$(sed </etc/myname 's/^[^\.]*\.//')
+    fi
+fi
+if [ -z "$fqdn" ]; then
+    fqdn=${hostname}.${domain}
+fi
+
+if [ -z "$ipaddr" ]; then
+    ipaddr=$(dig +short $fqdn)
+fi
+
+echo hostname=$hostname
+echo domain=$domain
+echo fqdn=$fqdn
+echo ipaddr=$ipaddr
+echo outdir=$outdir
+
 [ -n "$hostname" ] || fail "missing hostname"
-[ -n "$ipaddr" ] || ipaddr=$(dig +short $hostname)
+if grep -q <<<$hostname '\.'; then
+    fail "hostname must not be fqdn"
+fi
+
+[ -n "$fqdn" ] || fail "missing fqdn"
+if ! grep -q <<<$fqdn '\.'; then
+    fail "bad fqdn: $fqdn"
+fi
+
+[ -n "$domain" ] || fail "missing domain"
+if ! grep -q <<<$domain '\.'; then
+    fail "bad domain: $domain"
+fi
+
 [ -n "$ipaddr" ] || fail "missing ip address"
+if ! egrep -q <<<$ipaddr '^([0-9]{1,3}\.){3}[0-9]{1,3}$' ; then
+    fail "bad ipaddr: $ipaddr"
+fi
+
 [ -n "$outdir" ] || fail "missing output dir"
-[ -e $outdir ] || fail "output directory not found: $outdir"
+[ -d $outdir ] || fail "invalid output directory: $outdir"
 
 generate_certs() {
     name=$1
     mkcert --force $hostname --cert-file ${name}-server-cert.pem --key-file ${name}-server-key.pem --duration 1y \
-	-- --san $hostname --san $ipaddr --san localhost --san 127.0.0.1
+	-- --san $hostname --san $fqdn --san $ipaddr --san localhost --san 127.0.0.1
     mkcert --force ${name}-client --cert-file ${name}-client-cert.pem --key-file ${name}-client-key.pem --duration 1y
 }
 
 ( 
     cd $outdir
     mkcert --force --chain keymaster.pem
+    mkcert --force --root keymaster-root.pem
+    mkcert --force --intermediate keymaster-intermediate.pem
     generate_certs netboot
     generate_certs winexec
 )
