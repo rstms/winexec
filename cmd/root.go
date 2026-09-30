@@ -37,8 +37,6 @@ import (
 	"os"
 )
 
-var Server *server.WinexecServer
-
 var rootCmd = &cobra.Command{
 	Use:     "winexec",
 	Version: server.Version,
@@ -57,6 +55,7 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
 func init() {
 	CobraInit(rootCmd)
 	OptionSwitch(rootCmd, "quiet", "q", "suppress output")

@@ -29,16 +29,13 @@ func dumpConfig(t *testing.T) {
 func initTestConfig(t *testing.T) {
 	require.NotEmpty(t, os.Getenv("WINEXEC_HOST"))
 	testFile := filepath.Join("testdata", "config.yaml")
-	Init("test", Version, testFile)
+	Init("winexec", Version, testFile)
 	ViperSet("debug", true)
 }
 
 func initClient(t *testing.T) *WinexecClient {
 	initTestConfig(t)
-	caFile := filepath.Join("testdata", "certs", "ca.pem")
-	certFile := filepath.Join("testdata", "certs", "cert.pem")
-	keyFile := filepath.Join("testdata", "certs", "key.pem")
-	c, err := NewWinexecClient(caFile, certFile, keyFile)
+	c, err := NewWinexecClient("client")
 	require.Nil(t, err)
 	return c
 }

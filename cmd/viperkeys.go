@@ -32,7 +32,7 @@ package cmd
 
 import (
 	"fmt"
-
+	"github.com/rstms/winexec/server"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +43,9 @@ var viperkeysCmd = &cobra.Command{
 Write the viper server configuration keys and values to stdout
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg := Server.GetConfig()
+		winexec, err := server.NewWinexecServer("winexec")
+		cobra.CheckErr(err)
+		cfg := winexec.GetConfig()
 		for k, v := range cfg {
 			fmt.Printf("%s: %v\n", k, v)
 		}

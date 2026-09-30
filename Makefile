@@ -70,3 +70,10 @@ sterile: clean
 
 show-vars:
 	@$(foreach var,$(all_variables),echo $(var)=$($(var));)
+
+
+testcerts:
+	mkdir -p client/testdata/certs
+	cd client/testdata/certs && mkcert --root keymaster.pem --force
+	cd client/testdata/certs && mkcert winexec-client --duration 1y --force
+	ls -al client/testdata/certs

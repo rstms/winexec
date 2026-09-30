@@ -1,14 +1,16 @@
-test:
-  logfile: stderr
+winexec:
+  logfile: /var/log/winexec
   debug: true
   verbose: true
   files_dir: /users/${USER}/Downloads
   subs_dir: //./h/vmware
   user_file: /c/users/mkrueger/howdy.txt
   test_iso_url: "http://ca.rstms.net/keymaster.pem"
-  winexec:
-    client: 
-      url: https://${WINEXEC_HOST}:10080
-      ca: testdata/certs/keymaster.pem
-      cert: testdata/certs/winexec-test-client-cert.pem
-      key: testdata/certs/winexec-test-client-key.pem
+  client: 
+    verbose: true
+    debug: true
+    url: https://${WINEXEC_HOST}:10080
+    ca: testdata/certs/keymaster.pem
+    cert: testdata/certs/winexec-client.pem
+    key: testdata/certs/winexec-client.key
+  debug_viper: true
