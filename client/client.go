@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -18,41 +19,60 @@ const Version = "1.2.17"
 const DEFAULT_AUTO_DELETE_SECONDS = 300
 
 type WinexecClient struct {
-	url               string
+	URL               string
 	debug             bool
 	AutoDeleteSeconds int
-	certSubject       string
-	certDuration      string
 	api               APIClient
 	server            *server.WinexecServer
+	CA                string
+	Cert              string
+	Key               string
 }
 
-func viperPrefix() string {
-	prefix := "winexec.client."
-	if ProgramName() == "winexec" {
-		prefix = "client."
+func viperPrefix(prefix string) (string, error) {
+	if prefix == "" {
+		if ProgramName() == "winexec" {
+			prefix = "client."
+		} else {
+			prefix = "winexec.client."
+		}
 	}
-	return prefix
+	if prefix == "" {
+		return "", Fatalf("missing viper prefix")
+	}
+	if !strings.HasSuffix(prefix, ".") {
+		prefix += "."
+	}
+	return prefix, nil
 }
 
-func NewWinexecClient(caFile, certFile, keyFile string) (*WinexecClient, error) {
-
-	prefix := viperPrefix()
+func NewWinexecClient(prefix string) (*WinexecClient, error) {
+	var err error
+	prefix, err = viperPrefix(prefix)
+	if err != nil {
+		return nil, Fatal(err)
+	}
 	defaultURL := &url.URL{
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", server.DEFAULT_BIND_ADDRESS, server.DEFAULT_HTTPS_PORT),
 	}
-	var err error
 	if ViperGetString(prefix+"url") != "" {
 		defaultURL, err = url.Parse(ViperGetString(prefix + "url"))
 		if err != nil {
 			return nil, Fatal(err)
 		}
 	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return nil, Fatal(err)
+	}
 	ViperSetDefault(prefix+"scheme", defaultURL.Scheme)
 	ViperSetDefault(prefix+"hostname", defaultURL.Hostname())
 	ViperSetDefault(prefix+"https_port", defaultURL.Port())
 	ViperSetDefault(prefix+"path", defaultURL.Path)
+	ViperSetDefault(prefix+"ca", filepath.Join(configDir, ProgramName(), "keymaster.pem"))
+	ViperSetDefault(prefix+"cert", filepath.Join(configDir, ProgramName(), "winexec_client.pem"))
+	ViperSetDefault(prefix+"key", filepath.Join(configDir, ProgramName(), "winexec_client.key"))
 
 	winexecURL := url.URL{
 		Scheme: ViperGetString(prefix + "scheme"),
@@ -65,17 +85,15 @@ func NewWinexecClient(caFile, certFile, keyFile string) (*WinexecClient, error) 
 		winexecURL.Host += ":" + ViperGetString(prefix+"https_port")
 	}
 	client := WinexecClient{
-		url:               winexecURL.String(),
+		URL:               winexecURL.String(),
 		debug:             ViperGetBool(prefix + "debug"),
 		AutoDeleteSeconds: ViperGetInt(prefix + "auto_delete_seconds"),
+		CA:                ViperGetString(prefix + "ca"),
+		Cert:              ViperGetString(prefix + "cert"),
+		Key:               ViperGetString(prefix + "key"),
 	}
 
-	fmt.Printf("winexec.client.url: %s\n", client.url)
-	fmt.Printf("winexec.client.ca: %s\n", caFile)
-	fmt.Printf("winexec.client.cert: %s\n", certFile)
-	fmt.Printf("winexec.client.key: %s\n", keyFile)
-
-	client.api, err = NewAPIClient(prefix, client.url, certFile, keyFile, caFile, nil)
+	client.api, err = NewAPIClient(prefix, client.URL, client.Cert, client.Key, client.CA, nil)
 	if err != nil {
 		return nil, Fatal(err)
 	}
@@ -85,7 +103,7 @@ func NewWinexecClient(caFile, certFile, keyFile string) (*WinexecClient, error) 
 	}
 
 	if ViperGetBool(prefix + "enable_winexec_server") {
-		client.server, err = server.NewWinexecServer()
+		client.server, err = server.NewWinexecServer("winexec")
 		if err != nil {
 			return nil, Fatal(err)
 		}
@@ -104,15 +122,18 @@ func (c *WinexecClient) Close() error {
 	return nil
 }
 
-func (c *WinexecClient) GetConfig() map[string]any {
-	prefix := ViperKey(viperPrefix()) + "."
+func (c *WinexecClient) GetConfig(prefix string) (map[string]any, error) {
+	prefix, err := viperPrefix(prefix)
+	if err != nil {
+		return nil, Fatal(err)
+	}
 	cfg := make(map[string]any)
 	for _, key := range viper.AllKeys() {
 		if strings.HasPrefix(key, prefix) {
 			cfg[key] = viper.Get(key)
 		}
 	}
-	return cfg
+	return cfg, nil
 }
 
 func (c *WinexecClient) Spawn(command string, args, env []string, exitCode *int) error {

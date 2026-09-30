@@ -30,6 +30,7 @@ var Verbose bool
 var Debug bool
 
 type WinexecServer struct {
+	Prefix                 string
 	Name                   string
 	Address                string
 	Version                string
@@ -57,19 +58,31 @@ type WinexecServer struct {
 	shutdownCommandArgs []string
 }
 
-func viperPrefix() string {
-	prefix := "winexec.server."
-	if ProgramName() == "winexec" {
-		prefix = "server."
+func viperPrefix(prefix string) (string, error) {
+	if prefix == "" {
+		if ProgramName() == "winexec" {
+			prefix = "server."
+		} else {
+			prefix = "winexec.server."
+		}
 	}
-	return prefix
+	if prefix == "" {
+		return "", Fatalf("missing viper prefix")
+	}
+	if !strings.HasSuffix(prefix, ".") {
+		prefix += "."
+	}
+	return prefix, nil
 }
 
-func NewWinexecServer() (*WinexecServer, error) {
-	prefix := viperPrefix()
+func NewWinexecServer(prefix string) (*WinexecServer, error) {
+	prefix, err := viperPrefix(prefix)
+	if err != nil {
+		return nil, Fatal(err)
+	}
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
-		return nil, err
+		return nil, Fatal(err)
 	}
 	configDir := filepath.Join(userConfigDir, ProgramName())
 	ViperSetDefault(prefix+"bind_address", DEFAULT_BIND_ADDRESS)
@@ -81,6 +94,7 @@ func NewWinexecServer() (*WinexecServer, error) {
 	ViperSetDefault(prefix+"autodelete_interval_seconds", DEFAULT_AUTODELETE_INTERVAL_SECONDS)
 
 	s := WinexecServer{
+		Prefix:                    prefix,
 		Name:                      "winexec",
 		Address:                   ViperGetString(prefix + "bind_address"),
 		Port:                      ViperGetInt(prefix + "https_port"),
@@ -106,16 +120,16 @@ func NewWinexecServer() (*WinexecServer, error) {
 	Verbose = s.verbose
 	Debug = s.debug
 	if Debug {
-		log.Printf("winexec server config: %s\n", FormatJSON(s.GetConfig()))
+		config := s.GetConfig()
+		log.Printf("winexec server config: %s\n", FormatJSON(config))
 	}
 	return &s, nil
 }
 
 func (s *WinexecServer) GetConfig() map[string]any {
-	prefix := ViperKey(viperPrefix())
 	cfg := make(map[string]any)
 	for _, key := range viper.AllKeys() {
-		if strings.HasPrefix(key, prefix) {
+		if strings.HasPrefix(key, s.Prefix) {
 			cfg[key] = viper.Get(key)
 		}
 	}

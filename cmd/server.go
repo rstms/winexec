@@ -50,10 +50,11 @@ Implement an HTTPS API server for remote execution and filesystem functions,
 secured by mutual TLS authentication with a private x509 CA
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		daemon, err := server.NewWinexecServer()
+		daemon, err := server.NewWinexecServer("winexec")
 		cobra.CheckErr(err)
 		if ViperGetBool("debug") {
-			fmt.Println(FormatJSON(daemon.GetConfig()))
+			config := daemon.GetConfig()
+			fmt.Println(FormatJSON(config))
 		}
 		if ViperGetBool("server.hide") {
 			err := console.ConsoleHide()
