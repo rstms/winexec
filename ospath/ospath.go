@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const Version = "1.2.16"
+const Version = "1.2.17"
 
 // convert a local path to a windows path
 func WindowsPath(localPath string) string {
