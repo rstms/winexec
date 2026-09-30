@@ -38,6 +38,7 @@ func viperPrefix() string {
 func NewWinexecClient(caFile, certFile, keyFile string) (*WinexecClient, error) {
 
 	prefix := viperPrefix()
+	fmt.Printf("NewWinexecClient: prefix=%s\n", prefix)
 	defaultURL := &url.URL{
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", server.DEFAULT_BIND_ADDRESS, server.DEFAULT_HTTPS_PORT),
