@@ -39,6 +39,7 @@ func NewWinexecClient(caFile, certFile, keyFile string) (*WinexecClient, error) 
 
 	prefix := viperPrefix()
 	fmt.Printf("NewWinexecClient: prefix=%s\n", prefix)
+	fmt.Printf("NewWinexecClient: debug=%v\n", ViperGet(prefix+"debug"))
 	defaultURL := &url.URL{
 		Scheme: "https",
 		Host:   fmt.Sprintf("%s:%d", server.DEFAULT_BIND_ADDRESS, server.DEFAULT_HTTPS_PORT),
@@ -70,6 +71,11 @@ func NewWinexecClient(caFile, certFile, keyFile string) (*WinexecClient, error) 
 		debug:             ViperGetBool(prefix + "debug"),
 		AutoDeleteSeconds: ViperGetInt(prefix + "auto_delete_seconds"),
 	}
+
+	fmt.Printf("winexec.client.url: %s\n", client.url)
+	fmt.Printf("winexec.client.ca: %s\n", caFile)
+	fmt.Printf("winexec.client.cert: %s\n", certFile)
+	fmt.Printf("winexec.client.key: %s\n", keyFile)
 
 	client.api, err = NewAPIClient("winexec", client.url, certFile, keyFile, caFile, nil)
 	if err != nil {
